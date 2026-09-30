@@ -8,7 +8,7 @@
 - OBB：`scanly/train/train_obb.py`
 - 导出加密 ONNX：`scanly/train/convert_2_onnx.py`（YOLO `.pt`）
 
-数据准备：`scanly/train/prepare_dataset.py`（`label_format=detect|obb`）。设计：`scanly/doc/02-dr/缺陷训练/01.数据集准备与YOLO训练.md`、`scanly/doc/02-dr/缺陷训练/02.YOLO导出ONNX与加密.md`、`scanly/doc/02-dr/缺陷训练/05.检测core训练.md`、`scanly/doc/02-dr/缺陷训练/06.检测core测试集验证.md`。
+数据准备：`scanly/train/train_detect_cfg/prepare_dataset.py`（`label_format=detect|obb`）。设计：`scanly/doc/02-dr/缺陷训练/01.数据集准备与YOLO训练.md`、`scanly/doc/02-dr/缺陷训练/02.YOLO导出ONNX与加密.md`、`scanly/doc/02-dr/缺陷训练/05.检测core训练.md`、`scanly/doc/02-dr/缺陷训练/06.检测core测试集验证.md`。
 
 已归档 run（v1.1–v2.1）的 val 曲线与结论：`scanly/doc/测试结果/各版本训练日志分析.md`（磁盘副本 `/Volumes/shunyao-h1/scanly/训练结果/说明.md`）。
 
@@ -30,12 +30,12 @@ pip install -r scanly/train/requirements.txt
 
 | 路径 | 作用 |
 |:---|:---|
-| `scanly/train/train_detect_cfg/data_cfg.json` | 公共数据：源路径、`voc_xml_path`、`train_classes`、划分 |
-| `scanly/train/train_detect_yolo/train_config.json` | YOLO 检测超参与 `output_dir`（`train.py`） |
-| `scanly/train/train_detect_core/train_config.json` | 检测 core 超参 / yaml / 预训练（`train_core.py`） |
-| `scanly/train/train_detect_obb/train_config.json` | OBB 超参（可覆盖公共数据批次；`train_obb.py`） |
+| `scanly/train/train_detect_cfg/data_cfg.json` | 公共数据：源路径、`voc_xml_path`、`train_classes`、划分、`output_dir`（数据与训练同根） |
+| `scanly/train/train_detect_yolo/train_config.json` | YOLO 检测超参（`train.py`）；可覆盖 `output_dir` |
+| `scanly/train/train_detect_core/train_config.json` | 检测 core 超参 / yaml / 预训练 / `run_prefix`（`train_core.py`） |
+| `scanly/train/train_detect_obb/train_config.json` | OBB 超参（可覆盖公共数据批次与 `output_dir`；`train_obb.py`） |
 
-入口 `__main__` 仅改 `CONFIG_PATH`（及检测 core 的 `TEST_ONLY` / `RESUME`）。改数据只动 `train_detect_cfg`；改超参只动对应入口 JSON。`voc_xml_path` 非空优先于 `source_data_root`。设计见 `scanly/doc/02-dr/缺陷训练/07.数据配置与训练配置解耦.md`。
+入口 `__main__` 仅改 `CONFIG_PATH`（及检测 core 的 `TEST_ONLY` / `RESUME`）。改数据或输出目录只动 `train_detect_cfg`；改超参只动对应入口 JSON。`voc_xml_path` 非空优先于 `source_data_root`。设计见 `scanly/doc/02-dr/缺陷训练/07.数据配置与训练配置解耦.md`。
 
 `test.py` / `test_core.py` 仍可在变量区指定权重与划分；`output_dir` / imgsz / batch 宜与对应训练配置一致。
 

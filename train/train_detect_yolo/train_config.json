@@ -1,9 +1,7 @@
 {
-  "_comment": "YOLO 检测入口。数据源/类别/划分见 ../train_detect_cfg/data_cfg.json。本文件写训练超参与 staging。",
-  "output_dir": "../output/cam2-0911-1024-train",
+  "_comment": "YOLO 检测入口。数据源/类别/划分/output_dir 见 ../train_detect_cfg/data_cfg.json。本文件写训练超参与 staging 开关；换批次时可覆盖 output_dir。",
   "skip_prepare": false,
   "prepare_only": false,
-  "train_project": "../runs",
   "model_path": "yolo11l.pt",
   "device": "",
   "single_cls": false,

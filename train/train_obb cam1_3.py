@@ -12,7 +12,7 @@ _TRAIN_DIR = Path(__file__).resolve().parent
 if str(_TRAIN_DIR) not in sys.path:
     sys.path.insert(0, str(_TRAIN_DIR))
 
-from prepare_dataset import prepare_dataset  # noqa: E402
+from train_detect_cfg.prepare_dataset import prepare_dataset  # noqa: E402
 from train import resolve_device, run_train  # noqa: E402
 
 logger = logging.getLogger(__name__)

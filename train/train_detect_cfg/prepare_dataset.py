@@ -895,10 +895,11 @@ def prepare_dataset(
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 
-    SCANLY_ROOT = Path(__file__).resolve().parents[1]
+    _TRAIN_DIR = Path(__file__).resolve().parents[1]
+    SCANLY_ROOT = Path(__file__).resolve().parents[2]
     # 支持单层（cam123-0820/BandBroken/...）或多层（cam-all-0901/cam2/BandBroken/...）自动合并
     SOURCE_DATA_ROOT = SCANLY_ROOT / "样本数据" / "cam-all-0901"
-    OUTPUT_DIR = Path(__file__).resolve().parent / "output" / "cam-all-0901"
+    OUTPUT_DIR = _TRAIN_DIR / "output" / "cam-all-0901"
     TRAIN_CLASSES = [
         # "BandBroken",
         # "BandBroken2",

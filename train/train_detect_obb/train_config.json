@@ -31,9 +31,9 @@
     "seed": 42
   },
   "output_dir": "../output/cam123-0820-obb",
+  "_output_dir_note": "覆盖公共 data_cfg 的 output_dir（本入口换批次）。数据与训练 run 同根。",
   "skip_prepare": false,
   "prepare_only": false,
-  "train_project": "../runs",
   "model_path": "yolo11m-obb.pt",
   "device": "",
   "train": {

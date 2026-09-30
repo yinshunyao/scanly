@@ -16,7 +16,7 @@ _TRAIN_DIR = Path(__file__).resolve().parent
 if str(_TRAIN_DIR) not in sys.path:
     sys.path.insert(0, str(_TRAIN_DIR))
 
-from prepare_dataset import prepare_dataset  # noqa: E402
+from train_detect_cfg.prepare_dataset import prepare_dataset  # noqa: E402
 from train import assert_prepared_dataset, resolve_device, sync_data_yaml_path  # noqa: E402
 from train_detect_cfg.load_cfg import (  # noqa: E402
     load_merged_cfg,
@@ -47,7 +47,7 @@ def call_prepare_dataset(**kwargs: Any) -> dict[str, Any]:
     skipped = [key for key in kwargs if key not in params]
     if skipped:
         logger.warning(
-            "当前 prepare_dataset 不支持 %s，已忽略；建议同步最新 prepare_dataset.py",
+            "当前 prepare_dataset 不支持 %s，已忽略；建议同步最新 train_detect_cfg/prepare_dataset.py",
             ", ".join(skipped),
         )
     return prepare_dataset(**accepted)
@@ -330,27 +330,34 @@ def run_post_train_eval(
     single_cls: bool,
     test_ratio: float,
     val_split: str,
+    test_model_path: Path | None = None,
+    skip_val: bool = False,
 ) -> None:
-    """fit 结束后先 val、再按 TEST_RATIO 与 test 图像决定是否 test。延迟 import 避免循环依赖。"""
+    """fit 结束后：先用 checkpoint 做 val；再按 TEST_RATIO 对 test 评估。
+
+    ``test_model_path`` 优先用于 test（一般为导出的 ``.onnx``）；为空则回退 ``checkpoint``。
+    ``skip_val=True`` 时只跑 test（val 已在外部完成）。
+    """
     sys.path.insert(0, str(_TRAIN_DIR))
     from test_core import run_val
 
-    logger.info("训练后评估：val split=%s ckpt=%s", val_split, checkpoint)
-    run_val(
-        output_dir=output_dir,
-        model_path=checkpoint,
-        model_yml=model_yml,
-        project=run_dir.parent,
-        run_name=run_dir.name,
-        device=device,
-        imgsz=imgsz,
-        batch=batch,
-        workers=workers,
-        split=val_split,
-        seed=seed,
-        single_cls=single_cls,
-        metrics_filename="val_metrics.json",
-    )
+    if not skip_val:
+        logger.info("训练后评估：val split=%s ckpt=%s", val_split, checkpoint)
+        run_val(
+            output_dir=output_dir,
+            model_path=checkpoint,
+            model_yml=model_yml,
+            project=run_dir.parent,
+            run_name=run_dir.name,
+            device=device,
+            imgsz=imgsz,
+            batch=batch,
+            workers=workers,
+            split=val_split,
+            seed=seed,
+            single_cls=single_cls,
+            metrics_filename="val_metrics.json",
+        )
     if test_ratio <= 0:
         logger.info("TEST_RATIO=%s <= 0，跳过 test 评估", test_ratio)
         return
@@ -362,10 +369,14 @@ def run_post_train_eval(
             test_img_dir,
         )
         return
-    logger.info("训练后评估：test ckpt=%s", checkpoint)
+    test_model = test_model_path if test_model_path is not None else checkpoint
+    if test_model_path is not None and not test_model.is_file():
+        logger.warning("指定 test 权重不存在，回退 checkpoint: %s", test_model_path)
+        test_model = checkpoint
+    logger.info("训练后评估：test model=%s", test_model)
     run_val(
         output_dir=output_dir,
-        model_path=checkpoint,
+        model_path=test_model,
         model_yml=model_yml,
         project=run_dir.parent,
         run_name=run_dir.name,
@@ -384,7 +395,6 @@ def run_train(
     *,
     output_dir: Path,
     class_names: list[str],
-    train_project: Path,
     run_prefix: str,
     model_yml: Path,
     tuning_path: Path | None,
@@ -429,7 +439,7 @@ def run_train(
     )
     val_img = str(output_dir / "images" / val_split)
 
-    run_dir = allocate_run_dir(train_project / run_prefix, resume=resume)
+    run_dir = allocate_run_dir(output_dir / run_prefix, resume=resume)
     run_dir.mkdir(parents=True, exist_ok=True)
     stop_epoch = max(0, epochs - max(0, close_mosaic))
     use_amp = device == "cuda"
@@ -530,6 +540,36 @@ def run_train(
     if ckpt is None:
         logger.warning("训练结束但无 best.pth/last.pth，跳过训练后评估与 ONNX: %s", run_dir)
         return
+
+    onnx_path: Path | None = None
+    # 先用最优 .pth 做 val，确认后再导出 ONNX，test 优先吃 ONNX
+    sys.path.insert(0, str(_TRAIN_DIR))
+    from test_core import run_val
+
+    logger.info("训练后评估：val split=%s ckpt=%s", val_split, ckpt)
+    run_val(
+        output_dir=output_dir,
+        model_path=ckpt,
+        model_yml=model_yml,
+        project=run_dir.parent,
+        run_name=run_dir.name,
+        device=device,
+        imgsz=imgsz,
+        batch=batch,
+        workers=workers,
+        split=val_split,
+        seed=seed,
+        single_cls=single_cls,
+        metrics_filename="val_metrics.json",
+    )
+    if export_onnx:
+        from src.misc.onnx_export import export_to_onnx
+
+        onnx_path = ckpt.with_suffix(".onnx")
+        logger.info("导出 ONNX: %s -> %s (imgsz=%d)", ckpt, onnx_path, imgsz)
+        export_to_onnx(ycfg, onnx_path, imgsz, checkpoint=ckpt, check=True, simplify=False)
+        logger.info("ONNX 已写出: %s", onnx_path)
+
     run_post_train_eval(
         output_dir=output_dir,
         run_dir=run_dir,
@@ -543,14 +583,9 @@ def run_train(
         single_cls=single_cls,
         test_ratio=test_ratio,
         val_split=val_split,
+        test_model_path=onnx_path,
+        skip_val=True,
     )
-    if export_onnx:
-        from src.misc.onnx_export import export_to_onnx
-
-        out = ckpt.with_suffix(".onnx")
-        logger.info("导出 ONNX: %s -> %s (imgsz=%d)", ckpt, out, imgsz)
-        export_to_onnx(ycfg, out, imgsz, checkpoint=ckpt, check=True, simplify=False)
-        logger.info("ONNX 已写出: %s", out)
 
 
 def main(
@@ -565,7 +600,6 @@ def main(
     copy_images: bool,
     skip_prepare: bool,
     prepare_only: bool,
-    train_project: Path,
     run_prefix: str,
     model_yml: Path,
     tuning_path: Path | None,
@@ -627,7 +661,6 @@ def main(
     run_train(
         output_dir=output_dir,
         class_names=class_names,
-        train_project=train_project,
         run_prefix=run_prefix,
         model_yml=model_yml,
         tuning_path=tuning_path,
@@ -667,9 +700,12 @@ def main_from_config(
     val_ratio, test_ratio, seed = split_ratios(cfg)
     tuning_raw = cfg.get("tuning")
     tuning_path = Path(str(tuning_raw)) if tuning_raw else None
+    output_raw = cfg.get("output_dir")
+    if not output_raw:
+        raise ValueError("缺少 output_dir（应在 data_cfg.json 或入口 train_config 中配置）")
     main(
         source_data_root=resolve_source_root(cfg),
-        output_dir=Path(str(cfg["output_dir"])),
+        output_dir=Path(str(output_raw)),
         train_classes=list(cfg.get("train_classes") or []),
         val_ratio=val_ratio,
         test_ratio=test_ratio,
@@ -678,7 +714,6 @@ def main_from_config(
         copy_images=bool(cfg.get("copy_images", True)),
         skip_prepare=bool(cfg.get("skip_prepare", False)),
         prepare_only=bool(cfg.get("prepare_only", False)),
-        train_project=Path(str(cfg.get("train_project") or (_TRAIN_DIR / "runs"))),
         run_prefix=str(cfg.get("run_prefix") or "detect_core"),
         model_yml=Path(str(cfg["model_yml"])),
         tuning_path=tuning_path,
@@ -702,11 +737,11 @@ def main_from_config(
 
 
 if __name__ == "__main__":
-    # 改数据：train_detect_cfg/data_cfg.json；改超参/骨干：train_detect_core/train_config.json
+    # 改数据/output_dir：train_detect_cfg/data_cfg.json；改超参/骨干：train_detect_core/train_config.json
     import multiprocessing
 
     multiprocessing.freeze_support()
     CONFIG_PATH = str(DEFAULT_TRAIN_CONFIG)
     TEST_ONLY = False
-    RESUME = None  # 例如 "runs/core_r18/last.pth"
+    RESUME = None  # 例如 "<output_dir>/core_r18/last.pth"
     main_from_config(CONFIG_PATH, test_only=TEST_ONLY, resume=RESUME)

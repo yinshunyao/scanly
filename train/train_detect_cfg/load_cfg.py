@@ -42,6 +42,7 @@ def load_data_cfg() -> dict:
         raw.get("source_data_root"), base=CFG_DIR
     )
     raw["voc_xml_path"] = _absolutize_optional_path(raw.get("voc_xml_path"), base=CFG_DIR)
+    raw["output_dir"] = _absolutize_optional_path(raw.get("output_dir"), base=CFG_DIR)
     return raw
 
 
@@ -70,7 +71,7 @@ def merge_model_cfg(
         out["voc_xml_path"] = _absolutize_optional_path(
             overlay.get("voc_xml_path"), base=model_cfg_dir
         )
-    for path_key in ("output_dir", "train_project", "model_yml", "tuning", "model_path"):
+    for path_key in ("output_dir", "model_yml", "tuning", "model_path"):
         if path_key in overlay and overlay.get(path_key) not in (None, ""):
             raw = overlay.get(path_key)
             # model_path 可能是 ultralytics 权重名（如 yolo11l.pt），仅相对/绝对路径才解析

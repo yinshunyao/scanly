@@ -31,20 +31,20 @@ python train_obb.py      # OBB
 
 ## pyfernet 加密与运行
 
-客户机只跑密文，磁盘不落训练 `.py`。先装工具，再在 `scanly/train/` 下打包（入口为检测 core）：
+客户机只跑密文，磁盘不落训练 `.py`。先装工具，再打包整个 `scanly/train/`（入口 `train_core.py`）：
 
 ```bash
 cd train
 python3 -m pip install pyfernet-payload
 
-# 加密：打包当前训练目录，入口 train_core.py
+# 加密：打包当前 train 目录，入口 train_core.py
 # 加密前勿把 output/、runs/、pretrained/、大样本打进包（可先拷干净子集再 encrypt）
 python3 -m pyfernet encrypt . \
   -o train_core.enc \
   -e train_core.py
 
 # 前台运行：交互输入口令（终端不回显）
-python3 -m pyfernet run train_core.enc
+/home/beyond/.conda/envs/yolo11/bin/python3 -m pyfernet run train_core.enc
 ```
 
 口令不要写在 `-p` 或命令行里（会进 `ps` / shell 历史）。后台跑用环境变量：
@@ -53,12 +53,11 @@ python3 -m pyfernet run train_core.enc
 read -s PYFERNET_PASSWORD
 export PYFERNET_PASSWORD
 
-nohup python3 -m pyfernet run train_core.enc \
-  --password-env PYFERNET_PASSWORD > d.log 2>&1 &
+nohup /home/beyond/.conda/envs/yolo11/bin/python3 -m pyfernet run train_core.enc \
+  --password-env PYFERNET_PASSWORD > scanly.log 2>&1 &
 
 unset PYFERNET_PASSWORD
 ```
-
 查看包内文件：
 
 ```bash

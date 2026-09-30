@@ -16,7 +16,7 @@ _TRAIN_DIR = Path(__file__).resolve().parent
 if str(_TRAIN_DIR) not in sys.path:
     sys.path.insert(0, str(_TRAIN_DIR))
 
-from prepare_dataset import prepare_dataset  # noqa: E402
+from train_detect_cfg.prepare_dataset import prepare_dataset  # noqa: E402
 from train_detect_cfg.load_cfg import (  # noqa: E402
     load_merged_cfg,
     resolve_source_root,
@@ -47,7 +47,7 @@ def assert_prepared_dataset(output_dir: Path) -> Path:
     if not data_yaml.is_file():
         raise FileNotFoundError(
             f"未找到已预处理数据集: {data_yaml}；请设 skip_prepare=false 重新准备，"
-            "或运行 prepare_dataset.py"
+            "或运行 train_detect_cfg/prepare_dataset.py"
         )
     return data_yaml
 
@@ -137,7 +137,6 @@ def main(
     skip_prepare: bool,
     prepare_only: bool,
     model_path: str,
-    train_project: Path,
     imgsz: int,
     epochs: int,
     batch: int,
@@ -184,7 +183,7 @@ def main(
     run_train(
         data_yaml=data_yaml,
         model_path=model_path,
-        project=train_project,
+        project=output_dir,
         device=resolved_device,
         imgsz=imgsz,
         epochs=epochs,
@@ -204,11 +203,12 @@ def main_from_config(config_path: str | Path | None = None) -> None:
 
     train_cfg = dict(cfg.get("train") or {})
     val_ratio, test_ratio, seed = split_ratios(cfg)
-    output_dir = Path(str(cfg["output_dir"]))
-    train_project = Path(str(cfg.get("train_project") or (_TRAIN_DIR / "runs")))
+    output_raw = cfg.get("output_dir")
+    if not output_raw:
+        raise ValueError("缺少 output_dir（应在 data_cfg.json 或入口 train_config 中配置）")
     main(
         source_data_root=resolve_source_root(cfg),
-        output_dir=output_dir,
+        output_dir=Path(str(output_raw)),
         train_classes=list(cfg.get("train_classes") or []),
         val_ratio=val_ratio,
         test_ratio=test_ratio,
@@ -218,7 +218,6 @@ def main_from_config(config_path: str | Path | None = None) -> None:
         skip_prepare=bool(cfg.get("skip_prepare", False)),
         prepare_only=bool(cfg.get("prepare_only", False)),
         model_path=str(cfg.get("model_path") or "yolo11l.pt"),
-        train_project=train_project,
         imgsz=int(train_cfg.get("imgsz", 1024)),
         epochs=int(train_cfg.get("epochs", 200)),
         batch=int(train_cfg.get("batch", 4)),
@@ -231,6 +230,6 @@ def main_from_config(config_path: str | Path | None = None) -> None:
 
 if __name__ == "__main__":
     # 客户机 nohup .../python3 train.py > d.log 2>&1 &
-    # 改数据：train_detect_cfg/data_cfg.json；改超参：train_detect_yolo/train_config.json
+    # 改数据/output_dir：train_detect_cfg/data_cfg.json；改超参：train_detect_yolo/train_config.json
     CONFIG_PATH = str(DEFAULT_TRAIN_CONFIG)
     main_from_config(CONFIG_PATH)

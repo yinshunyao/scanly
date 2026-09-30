@@ -1,16 +1,23 @@
 {
-  "_comment": "检测训练公共数据。类别见 train_classes（空=全部）。训练超参在各入口 train_config.json。路径相对本目录。",
+  "_comment": "检测训练公共数据。类别见 train_classes（空=全部）。训练超参在各入口 train_config.json。相对路径相对本目录。",
   "source_data_root": "../../样本数据/cam-all-0901",
-  "voc_xml_path": "../output/cam2-0911-1024",
-  "train_classes": [
+  "_source_data_root_note": "Label Studio YOLO 导出根：含 images/、labels/、classes.txt（根自身或下层多包可合并）。仅当 voc_xml_path 为空/null 时使用。",
+  "voc_xml_path": "/data/samples/base/CAM1_GlueSeam600张-voc",
+  "_voc_xml_path_note": "扁平 Pascal VOC 根：JPEGImages/ + Annotations/（可选 predefined_classes.txt）。非空则优先于 source_data_root，准备结果写到 output_dir，不得与本源同路径。不用 VOC 时设为 null 或 \"\"。",
+  "output_dir": "/data/samples/output/cam1-GlueSeam",
+  "_output_dir_note": "YOLO 检测数据根（data.yaml / images / labels）兼训练权重输出根。须与 VOC/YOLO 源目录不同。新目录须入口 skip_prepare=false 先准备；已有 data.yaml 可改 true 直接训。core 新 run 写在本目录下按 run_prefix 编号（如 core_r18）；YOLO/OBB 的 Ultralytics project 亦为本目录。入口 JSON 可覆盖。相对路径相对本目录。",
+  "train_classes_all": [
     "Above",
     "BandBroken",
     "Below",
     "Shorter"
   ],
+  "train_classes": [
+    "GlueSeam"
+  ],
   "_train_classes_note": "顺序即 class id。空列表=全部类别。注释掉的类在入口 JSON 覆盖或改本文件。完整候选见 OR/DR。",
   "voc_split": {
-    "val_ratio": 0.2,
+    "val_ratio": 0.1,
     "test_ratio": 0.1,
     "seed": 42
   },

@@ -35,9 +35,12 @@ def main_from_config(config_path: str | Path | None = None) -> None:
 
     train_cfg = dict(cfg.get("train") or {})
     val_ratio, test_ratio, seed = split_ratios(cfg)
+    output_raw = cfg.get("output_dir")
+    if not output_raw:
+        raise ValueError("缺少 output_dir（应在 data_cfg.json 或入口 train_config 中配置）")
     main(
         source_data_root=resolve_source_root(cfg),
-        output_dir=Path(str(cfg["output_dir"])),
+        output_dir=Path(str(output_raw)),
         train_classes=list(cfg.get("train_classes") or []),
         val_ratio=val_ratio,
         test_ratio=test_ratio,
@@ -47,7 +50,6 @@ def main_from_config(config_path: str | Path | None = None) -> None:
         skip_prepare=bool(cfg.get("skip_prepare", False)),
         prepare_only=bool(cfg.get("prepare_only", False)),
         model_path=str(cfg.get("model_path") or "yolo11m-obb.pt"),
-        train_project=Path(str(cfg.get("train_project") or (_TRAIN_DIR / "runs"))),
         imgsz=int(train_cfg.get("imgsz", 640)),
         epochs=int(train_cfg.get("epochs", 200)),
         batch=int(train_cfg.get("batch", 16)),

@@ -28,8 +28,9 @@
 | TC-07 | 有 `best.pth` | `TEST_ONLY=True`、`RESUME` 指向该文件 | 只评估，不写新编号训练目录 | 否 |
 | TC-08 | 入口源码 | 检查 import | 不出现 scanly 以外工程训练目录的 import | 否 |
 | TC-09 | 同目录 `prepare_dataset` 无 `test_ratio` 形参 | `SKIP_PREPARE=False` 跑入口 | 不抛 `unexpected keyword argument 'test_ratio'`；日志警告已忽略该参数；仍写出 train/val | 否 |
-| TC-10 | 短训结束，`TEST_RATIO>0` 且 `images/test` 有图 | 跑完 `train_core.py`（非 `TEST_ONLY`） | 日志先 val 后 test；run 目录有 `val_metrics.json` 与 `test_metrics.json`；评估后再按开关导出 ONNX | 否 |
-| TC-11 | `TEST_RATIO=0` | 跑完训练 | 有 `val_metrics.json`；日志声明跳过 test；不写 `test_metrics.json` | 否 |
+| TC-10 | 短训结束，`TEST_RATIO>0` 且 `images/test` 有图，`export_onnx=true` | 跑完 `train_core.py`（非 `TEST_ONLY`） | 日志顺序：val（`.pth`）→ 导出 ONNX → test（`.onnx`）；run 目录有 `val_metrics.json`、`test_metrics.json` 与同名 `.onnx` | 否 |
+| TC-10b | 同上但 `export_onnx=false` | 跑完训练 | test 回退用 `.pth`；有 `test_metrics.json`；无新导出 `.onnx` | 否 |
+| TC-11 | `TEST_RATIO=0` | 跑完训练 | 有 `val_metrics.json`；日志声明跳过 test；不写 `test_metrics.json`；仍可按开关导出 ONNX | 否 |
 | TC-12 | `TEST_RATIO>0` 但 `images/test` 为空 | 跑完训练 | val 完成；日志警告跳过 test；训练不因此失败 | 否 |
 
 # 自动化测试标识

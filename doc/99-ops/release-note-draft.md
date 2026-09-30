@@ -2,6 +2,10 @@
 
 ## 2026-09-30
 
+- `train_core.py` 训后顺序改为：最优 `.pth` 做 val →（可选）导出 ONNX → test 优先用 ONNX（`export_onnx=false` 时回退 `.pth`）。
+
+- `prepare_dataset.py` 迁入 `train/train_detect_cfg/`；入口改为 `from train_detect_cfg.prepare_dataset import ...`，便于 `train_scanly` 加密包自包含数据准备。
+
 - 检测 core 路径脱敏：`rtdetrv2_pytorch`→`detect_core`，`train_rtdetrv2.py`→`train_core.py`，`test_rtdetrv2.py`→`test_core.py`；Scanly yaml 迁到 `configs/core/core_*_scanly.yml`。README 补充 pyfernet 加密/运行命令。
 
 - 训练配置解耦：公共数据 `train/train_detect_cfg/`，YOLO / RT-DETRv2 / OBB 超参分别在 `train_detect_yolo` / `train_detect_core` / `train_detect_obb`；入口脚本读 JSON，不再在 `__main__` 堆数据列表。
