@@ -1,0 +1,16 @@
+{
+  "voc_dir": "/Users/shunyaoyin/Documents/code/ai-company/scanly/样本数据/cam-all-0901_voc",
+  "camera_ref_dir": "/Users/shunyaoyin/Documents/code/ai-company/scanly/样本数据/cam-all-0901",
+  "output_dir": "/Users/shunyaoyin/Documents/code/ai-company/scanly/样本数据/came-split-0906-voc",
+  "dry_run": false,
+  "image_count": 6876,
+  "cam13_count": 3555,
+  "cam2_count": 3321,
+  "conflict_count": 0,
+  "unmatched_count": 0,
+  "missing_xml_count": 0,
+  "copied_xml_count": 6876,
+  "conflicts": [],
+  "unmatched": [],
+  "missing_xml": []
+}

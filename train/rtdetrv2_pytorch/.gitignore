@@ -1,0 +1,6 @@
+_yolo_staging/
+_coco_staging/
+output/
+pretrained/*.pth
+*.pth
+__pycache__/

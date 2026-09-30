@@ -1,0 +1,70 @@
+# —— 样本与本地数据（体积大，勿入库）——
+样本数据/
+**/样本数据/
+*.zip
+*.7z
+*.rar
+*.tar
+*.tar.gz
+*.tgz
+
+# —— 训练产物 / 预处理输出 ——
+train/output/
+train/runs/
+**/pretrained/
+defects/output/
+defects/samples/
+
+# —— 权重与导出模型 ——
+*.pt
+*.pth
+*.onnx
+*.onnx.enc
+*.engine
+*.trt
+*.bin
+
+# —— Go / Python 推理：模型与第三方二进制 ——
+defects/predict_go/third_party/
+defects/predict_go/third_party_win/
+defects/predict_go/dist/
+defects/predict_go/models/
+defects/predict/models/
+defects/predict_go/keys/*.pem
+defects/predict_go/config/license.json
+
+# —— Python / IDE ——
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+*.egg-info/
+.eggs/
+.venv/
+venv/
+.env
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# —— 日志与临时 ——
+*.log
+*.tmp
+*.bak
+.~*
+doc/**/.~*
+
+# —— 办公大文件 ——
+*.xlsx
+*.xls
+*.pptx
+*.docx
+
+# —— 测试结果里的复核样例图（体积/隐私，勿入库）——
+doc/测试结果/annot_review_0901/
+doc/测试结果/**/*.jpg
+doc/测试结果/**/*.jpeg
+doc/测试结果/**/*.png
+doc/测试结果/**/*.log

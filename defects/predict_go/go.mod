@@ -1,0 +1,9 @@
+module scanly/defects/predict_go
+
+go 1.24.0
+
+require (
+	github.com/disintegration/imaging v1.6.2
+	github.com/yalue/onnxruntime_go v1.26.0
+	golang.org/x/image v0.27.0
+)

@@ -1,0 +1,37 @@
+__include__: [
+  '../dataset/scanly_detection.yml',
+  '../runtime.yml',
+  './include/dataloader.yml',
+  './include/optimizer.yml',
+  './include/rtdetrv2_r50vd.yml',
+]
+
+
+output_dir: ./output/rtdetrv2_r50vd_scanly
+
+
+PResNet:
+  depth: 50
+  freeze_at: -1
+  freeze_norm: False
+  pretrained: False
+
+
+eval_spatial_size: [1024, 1024]
+
+epoches: 200
+
+train_dataloader:
+  dataset:
+    transforms:
+      policy:
+        epoch: 190
+  collate_fn:
+    scales: ~
+    stop_epoch: 190
+  total_batch_size: 2
+  num_workers: 2
+
+val_dataloader:
+  total_batch_size: 2
+  num_workers: 2

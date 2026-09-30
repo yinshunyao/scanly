@@ -1,0 +1,8 @@
+output/
+runs/
+__pycache__/
+pretrained/
+*.pt
+*.pth
+*.onnx
+*.log

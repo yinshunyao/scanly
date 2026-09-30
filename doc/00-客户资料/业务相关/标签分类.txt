@@ -1,0 +1,45 @@
+<View>
+  <Image name="image" value="$image" maxWidth="100%" zoom="true" />
+
+  <RectangleLabels name="label" toName="image" strokeWidth="2">
+    <!-- ========== 溢胶/胶缝类 ========== -->
+    <Header value="崩缺" style="color:#333;font-size:14px;margin:6px 0"/>
+    <Label value="GlueGap" background="rgba(85,255,0,0.4)" strokeColor="rgb(85,255,0)"/>
+    <Header value="胶缝" style="color:#333;font-size:14px;margin:6px 0"/>
+    <Label value="GlueSeam" background="rgba(0,0,255,0.4)" strokeColor="rgb(0,0,255)"/>
+    <Header value="残胶" style="color:#333;font-size:14px;margin:6px 0"/>
+    <Label value="GlueResidue" background="rgba(255,85,0,0.4)" strokeColor="rgb(255,85,0)"/>
+    <Header value="夹胶" style="color:#333;font-size:14px;margin:6px 0"/>
+    <Label value="ClampGlue" background="rgba(255,255,0,0.4)" strokeColor="rgb(255,255,0)"/>
+
+    <!-- ========== 残留/无胶类 ========== -->
+    <Header value="开胶" style="color:#333;font-size:14px;margin:6px 0"/>
+    <Label value="Tackless" background="rgba(255,0,255,0.4)" strokeColor="rgb(255,0,255)"/>
+    <Header value="残带-非缺陷" style="color:#333;font-size:14px;margin:6px 0"/>
+    <Label value="ResidualTape" background="rgba(255,0,0,0.4)" strokeColor="rgb(255,0,0)"/>
+
+    <!-- ========== 长条类 ========== -->
+    <Header value="过长" style="color:#333;font-size:14px;margin:6px 0"/>
+    <Label value="Longer" background="rgba(85,255,255,0.4)" strokeColor="rgb(85,255,255)"/>
+    <Header value="过长2" style="color:#333;font-size:14px;margin:6px 0"/>
+    <Label value="Longer2" background="rgba(87,244,255,0.4)" strokeColor="rgb(87,244,255)"/>
+
+    <!-- ========== 凹凸、孔洞、划伤 ========== -->
+    <Header value="鼓包" style="color:#333;font-size:14px;margin:6px 0"/>
+    <Label value="Bumps" background="rgba(85,0,127,0.4)" strokeColor="rgb(85,0,127)"/>
+    <Header value="钻孔-非缺陷" style="color:#333;font-size:14px;margin:6px 0"/>
+    <Label value="Hole" background="rgba(255,170,255,0.4)" strokeColor="rgb(255,170,255)"/>
+    <Header value="刮板" style="color:#333;font-size:14px;margin:6px 0"/>
+    <Label value="Scrape" background="rgba(85,170,255,0.4)" strokeColor="rgb(85,170,255)"/>
+   <Header value="锯齿-非缺陷" style="color:#333;font-size:14px;margin:6px 0"/>
+    <Label value="Zigzag" background="rgba(237,250,0,0.4)" strokeColor="rgb(237,250,0)"/>
+
+    <!-- ========== 标签 ========== -->
+    <Header value="标签-非缺陷" style="color:#333;font-size:14px;margin:6px 0"/>
+    <Label value="Label" background="rgba(85,255,127,0.4)" strokeColor="rgb(85,255,127)"/>
+  </RectangleLabels>
+
+  <View style="margin-top:12px;padding-top:8px;border-top:1px solid #eee;">
+    <Header value="操作说明：选择标签后拖拽绘制矩形框标注缺陷"/>
+  </View>
+</View>

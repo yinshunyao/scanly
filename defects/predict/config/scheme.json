@@ -1,0 +1,223 @@
+{
+  "scheme_name": "20260605",
+  "mm_per_px": 0.03,
+    "channels": {
+        "ng": true,
+        "ng_area": true,
+        "label": true,
+        "label_area": false,
+        "discharge": true,
+        "discharge_area": false
+    },
+  "defects": [
+    {
+      "name": "GlueSeam",
+      "cn_name": "胶缝",
+      "enable": true,
+      "confidence": 0.3,
+      "detect_when_laminating": false,
+      "area_mm2": 0,
+      "ng": {"height_mm": 0.15, "logic": "or", "length_mm": 5.0},
+      "label": {"height_mm": 0.4, "logic": "and", "length_mm": 5.0},
+      "discharge": {"height_mm": 0.4, "logic": "and", "length_mm": 5.0}
+    },
+    {
+      "name": "Below",
+      "cn_name": "封边过低",
+      "enable": true,
+      "confidence": 0.3,
+      "detect_when_laminating": false,
+      "area_mm2": 0,
+      "ng": {"height_mm": 0.2, "logic": "and", "length_mm": 5.0},
+      "label": {"height_mm": 0.25, "logic": "and", "length_mm": 5.0},
+      "discharge": {"height_mm": 0.4, "logic": "and", "length_mm": 5.0}
+    },
+    {
+      "name": "Above",
+      "cn_name": "封边过高",
+      "enable": false,
+      "confidence": 0.3,
+      "detect_when_laminating": false,
+      "area_mm2": 0,
+      "ng": {"height_mm": 0.2, "logic": "and", "length_mm": 5.0},
+      "label": {"height_mm": 0.25, "logic": "and", "length_mm": 5.0},
+      "discharge": {"height_mm": 0.4, "logic": "and", "length_mm": 5.0}
+    },
+    {
+      "name": "Tackless",
+      "cn_name": "开胶",
+      "enable": true,
+      "confidence": 0.45,
+      "detect_when_laminating": false,
+      "area_mm2": 0,
+      "ng": {"height_mm": 1.0, "logic": "or", "length_mm": 5.0},
+      "label": {"height_mm": 1.0, "logic": "and", "length_mm": 5.0},
+      "discharge": {"height_mm": 5.0, "logic": "and", "length_mm": 6.0}
+    },
+    {
+      "name": "Shorter",
+      "cn_name": "短带",
+      "enable": true,
+      "confidence": 0.3,
+      "detect_when_laminating": true,
+      "area_mm2": 0,
+      "ng": {"height_mm": 0, "logic": "length_only", "length_mm": 0.1},
+      "label": {"height_mm": 0, "logic": "length_only", "length_mm": 0.1},
+      "discharge": {"height_mm": 0, "logic": "length_only", "length_mm": 3.0}
+    },
+    {
+      "name": "Longer",
+      "cn_name": "过长",
+      "enable": true,
+      "confidence": 0.35,
+      "detect_when_laminating": true,
+      "area_mm2": 0,
+      "ng": {"height_mm": 0, "logic": "length_only", "length_mm": 1.0},
+      "label": {"height_mm": 0, "logic": "length_only", "length_mm": 1.0},
+      "discharge": {"height_mm": 0, "logic": "length_only", "length_mm": 2.0}
+    },
+    {
+      "name": "Longer2",
+      "cn_name": "过长2",
+      "enable": true,
+      "confidence": 0.3,
+      "detect_when_laminating": true,
+      "area_mm2": 0,
+      "ng": {"height_mm": 0, "logic": "length_only", "length_mm": 0.5},
+      "label": {"height_mm": 0, "logic": "length_only", "length_mm": 1.0},
+      "discharge": {"height_mm": 0, "logic": "or", "length_mm": 0}
+    },
+    {
+      "name": "Scratch",
+      "cn_name": "划伤",
+      "enable": true,
+      "confidence": 0.85,
+      "detect_when_laminating": false,
+      "area_mm2": 0,
+      "ng": {"height_mm": 3.0, "logic": "and", "length_mm": 1.0},
+      "label": {"height_mm": 3.0, "logic": "and", "length_mm": 5.0},
+      "discharge": {"height_mm": 0, "logic": "length_only", "length_mm": 5.0}
+    },
+    {
+      "name": "Scrape",
+      "cn_name": "刮板",
+      "enable": true,
+      "confidence": 0.3,
+      "detect_when_laminating": false,
+      "area_mm2": 0,
+      "ng": {"height_mm": 0.5, "logic": "and", "length_mm": 0.5},
+      "label": {"height_mm": 0.5, "logic": "and", "length_mm": 1.0},
+      "discharge": {"height_mm": 0, "logic": "and", "length_mm": 0}
+    },
+    {
+      "name": "GlueResidue",
+      "cn_name": "残胶",
+      "enable": true,
+      "confidence": 0.3,
+      "detect_when_laminating": false,
+      "area_mm2": 0,
+      "ng": {"height_mm": 1.5, "logic": "and", "length_mm": 5.0},
+      "label": {"height_mm": 1.5, "logic": "and", "length_mm": 5.0},
+      "discharge": {"height_mm": 2.0, "logic": "and", "length_mm": 5.0}
+    },
+    {
+      "name": "GlueGap",
+      "cn_name": "崩缺",
+      "enable": true,
+      "confidence": 0.3,
+      "detect_when_laminating": false,
+      "area_mm2": 0,
+      "ng": {"height_mm": 0.6, "logic": "or", "length_mm": 1.0},
+      "label": {"height_mm": 1.0, "logic": "and", "length_mm": 1.0},
+      "discharge": {"height_mm": 2.0, "logic": "and", "length_mm": 99999.0}
+    },
+    {
+      "name": "BandBroken",
+      "cn_name": "封边带损伤",
+      "enable": true,
+      "confidence": 0.3,
+      "detect_when_laminating": false,
+      "area_mm2": 0,
+      "ng": {"height_mm": 2.0, "logic": "and", "length_mm": 2.0},
+      "label": {"height_mm": 2.0, "logic": "and", "length_mm": 2.0},
+      "discharge": {"height_mm": 2.0, "logic": "and", "length_mm": 2.0}
+    },
+    {
+      "name": "BandWave",
+      "cn_name": "波浪纹",
+      "enable": false,
+      "confidence": 0.3,
+      "detect_when_laminating": false,
+      "area_mm2": 0,
+      "ng": {"height_mm": 0.7, "logic": "or", "length_mm": 0},
+      "label": {"height_mm": 0.7, "logic": "or", "length_mm": 0},
+      "discharge": {"height_mm": 0, "logic": "and", "length_mm": 0}
+    },
+    {
+      "name": "Bumps",
+      "cn_name": "鼓包",
+      "enable": true,
+      "confidence": 0.2,
+      "detect_when_laminating": true,
+      "area_mm2": 0,
+      "ng": {"height_mm": 0, "logic": "length_only", "length_mm": 0.5},
+      "label": {"height_mm": 0, "logic": "length_only", "length_mm": 1.0},
+      "discharge": {"height_mm": 0.1, "logic": "and", "length_mm": 0.1}
+    },
+    {
+      "name": "ClampGlue",
+      "cn_name": "夹胶",
+      "enable": false,
+      "confidence": 0.3,
+      "detect_when_laminating": false,
+      "area_mm2": 0,
+      "ng": {"height_mm": 1.5, "logic": "and", "length_mm": 5.0},
+      "label": {"height_mm": 1.5, "logic": "and", "length_mm": 5.0},
+      "discharge": {"height_mm": 2.0, "logic": "and", "length_mm": 5.0}
+    },
+    {
+      "name": "ResidualTape",
+      "cn_name": "残带",
+      "enable": false,
+      "confidence": 0.3,
+      "detect_when_laminating": false,
+      "area_mm2": 0,
+      "ng": {"height_mm": 0, "logic": "and", "length_mm": 0},
+      "label": {"height_mm": 0, "logic": "and", "length_mm": 0},
+      "discharge": {"height_mm": 0, "logic": "and", "length_mm": 0}
+    },
+    {
+      "name": "Hole",
+      "cn_name": "钻孔",
+      "enable": false,
+      "confidence": 0.3,
+      "detect_when_laminating": false,
+      "area_mm2": 0,
+      "ng": {"height_mm": 0, "logic": "and", "length_mm": 0},
+      "label": {"height_mm": 0, "logic": "and", "length_mm": 0},
+      "discharge": {"height_mm": 0, "logic": "and", "length_mm": 0}
+    },
+    {
+      "name": "Zigzag",
+      "cn_name": "锯齿",
+      "enable": false,
+      "confidence": 0.3,
+      "detect_when_laminating": false,
+      "area_mm2": 0,
+      "ng": {"height_mm": 0, "logic": "and", "length_mm": 0},
+      "label": {"height_mm": 0, "logic": "and", "length_mm": 0},
+      "discharge": {"height_mm": 0, "logic": "and", "length_mm": 0}
+    },
+    {
+      "name": "Label",
+      "cn_name": "标签",
+      "enable": false,
+      "confidence": 0.3,
+      "detect_when_laminating": false,
+      "area_mm2": 0,
+      "ng": {"height_mm": 0, "logic": "and", "length_mm": 0},
+      "label": {"height_mm": 0, "logic": "and", "length_mm": 0},
+      "discharge": {"height_mm": 0, "logic": "and", "length_mm": 0}
+    }
+  ]
+}

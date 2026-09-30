@@ -1,0 +1,19 @@
+{
+  "_comment": "检测训练公共数据。类别见 train_classes（空=全部）。训练超参在各入口 train_config.json。路径相对本目录。",
+  "source_data_root": "../../样本数据/cam-all-0901",
+  "voc_xml_path": "../output/cam2-0911-1024",
+  "train_classes": [
+    "Above",
+    "BandBroken",
+    "Below",
+    "Shorter"
+  ],
+  "_train_classes_note": "顺序即 class id。空列表=全部类别。注释掉的类在入口 JSON 覆盖或改本文件。完整候选见 OR/DR。",
+  "voc_split": {
+    "val_ratio": 0.2,
+    "test_ratio": 0.1,
+    "seed": 42
+  },
+  "keep_empty_labels": true,
+  "copy_images": false
+}

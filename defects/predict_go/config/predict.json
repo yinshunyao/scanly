@@ -1,0 +1,20 @@
+{
+  "host": "0.0.0.0",
+  "port": 37871,
+  "infer_type": "obb",
+  "model_enc_path": "",
+  "obb_model_enc_path": "models/v1.3-onnx/v1.3-cam-all-middle.onnx.enc",
+  "detect_meta_path": "",
+  "obb_meta_path": "models/v1.3-onnx/v1.3-cam-all-middle.meta.json",
+  "license_path": "config/license.json",
+  "scheme_path": "../predict/config/scheme.json",
+  "ort_lib_path": "",
+  "device": "cuda",
+  "trt_fp16_enable": true,
+  "trt_engine_cache_path": "models/trt_cache",
+  "clip_size": 0,
+  "overlap_size": 120,
+  "conf": 0.25,
+  "iou": 0.45,
+  "mm_per_px": 0.03
+}

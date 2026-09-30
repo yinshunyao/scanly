@@ -1,0 +1,24 @@
+{
+  "_readme": {
+    "infer_type": "默认推理类型：detect=轴对齐检测（用 model_path）；obb=旋转框（用 obb_model_path）。缺省 obb。请求 JSON 可带同名字段覆盖本次。RT-DETRv2 .onnx 只能 detect。",
+    "model_path": "detect 权重：YOLO .pt/.onnx/.engine，或 RT-DETRv2 导出 .onnx（输入 images+orig_target_sizes）。相对路径相对本目录上级 models/。",
+    "obb_model_path": "obb 权重：YOLO-OBB .pt/.onnx。可空。若留空且 infer_type=obb、只配了 model_path，则把 model_path 当 OBB 加载（仅 YOLO-OBB）。",
+    "imgsz": "仅 RT-DETRv2 ONNX：方形输入边长，须与训练一致；<=0 时用模型静态维或 1024。",
+    "class_names": "仅 RT-DETRv2 ONNX：按 class id 的类名列表；单类训练默认 [\"defect\"]。",
+    "配对示例_detect_onnx": "infer_type=detect + model_path=xxx.onnx + obb_model_path 空",
+    "配对示例_obb_pt": "infer_type=obb + obb_model_path=xxx-obb.pt（或只配 model_path）"
+  },
+  "model_path": "/Volumes/shunyao-h1/scanly/训练结果/v2.3-c2.onnx",
+  "obb_model_path": "",
+  "infer_type": "detect",
+  "imgsz": 1024,
+  "class_names": ["defect"],
+  "device": null,
+  "clip_size": 0,
+  "overlap_size": 120,
+  "conf": 0.25,
+  "iou": 0.45,
+  "mm_per_px": 0.03,
+  "host": "0.0.0.0",
+  "port": 37870
+}

@@ -1,0 +1,36 @@
+python3 test/test_onnx_infer_perf.py 
+image=/root/scanly/samples/00282 02663_2024-09-20 21_58_21.003_HC_pFCu67P6Kc_82up.bmp shape=(1024, 1024, 3) device=cuda trt_fp16=True warmup=5 runs=30
+
+[load] fp32 <- /root/scanly/predict_go/models/v1.3-onnx/v1.3-cam-all-middle.onnx.enc
+[ort] package=/usr/local/lib/python3.10/dist-packages/onnxruntime/__init__.py
+[ort] version=1.18.1 available=['TensorrtExecutionProvider', 'CUDAExecutionProvider', 'AzureExecutionProvider', 'CPUExecutionProvider']
+[ort] session providers=['CUDAExecutionProvider', 'CPUExecutionProvider']
+[ort] input type=tensor(float) feed_dtype=<class 'numpy.float32'>
+
+=== fp32 ===
+meta.precision=unknown  session.input_dtype=float32  load_ms=651.8  last_dets=1
+e2e(letterbox+run+decode+nms) ms: mean=76.47  p50=76.28  p95=77.65  min=75.70  max=77.91  stdev=0.57  n=30
+ort(session.run only) ms:        mean=28.05  p50=27.96  p95=28.55  min=27.60  max=28.94  stdev=0.33  n=30
+
+[load] fp16 <- /root/scanly/predict_go/models/v1.3-onnx-fp16/v1.3-cam-all-middle.onnx.enc
+[ort] package=/usr/local/lib/python3.10/dist-packages/onnxruntime/__init__.py
+[ort] version=1.18.1 available=['TensorrtExecutionProvider', 'CUDAExecutionProvider', 'AzureExecutionProvider', 'CPUExecutionProvider']
+[ort] session providers=['CUDAExecutionProvider', 'CPUExecutionProvider']
+[ort] input type=tensor(float16) feed_dtype=<class 'numpy.float16'>
+
+=== fp16 ===
+meta.precision=fp16  session.input_dtype=float16  load_ms=201.3  last_dets=1
+e2e(letterbox+run+decode+nms) ms: mean=74.97  p50=74.59  p95=76.83  min=74.00  max=79.17  stdev=1.09  n=30
+ort(session.run only) ms:        mean=21.44  p50=21.34  p95=22.02  min=20.95  max=22.10  stdev=0.31  n=30
+
+加速比（相对 fp32，e2e mean）: fp32/fp16 = 1.020x
+加速比（相对 fp32，ort mean）: fp32/fp16 = 1.308x
+
+
+
+# TensorRT的结果
+
+=== fp32 ===
+meta.precision=unknown  session.input_dtype=float32  load_ms=458416.8  last_dets=1
+e2e(letterbox+run+decode+nms) ms: mean=55.05  p50=55.00  p95=55.42  min=54.77  max=55.48  stdev=0.19  n=30
+ort(session.run only) ms:        mean=6.62  p50=6.59  p95=6.82  min=6.43  max=6.88  stdev=0.11  n=30

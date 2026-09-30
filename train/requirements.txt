@@ -1,0 +1,9 @@
+ultralytics>=8.3
+opencv-python-headless>=4.8
+numpy>=1.24
+cryptography>=42.0.0
+# convert_2_onnx.py / Ultralytics export
+onnx>=1.12.0,<2.0.0
+onnxslim>=0.1.71
+onnxruntime>=1.16
+# RT-DETRv2：另装 scanly/train/rtdetrv2_pytorch/requirements.txt

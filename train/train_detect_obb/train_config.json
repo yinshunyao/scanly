@@ -1,0 +1,46 @@
+{
+  "_comment": "YOLO OBB 入口。默认覆盖公共数据批次；也可删掉覆盖键以完全复用 train_detect_cfg。",
+  "source_data_root": "../../样本数据/cam123-0820",
+  "voc_xml_path": null,
+  "train_classes": [
+    "Above",
+    "BandBroken",
+    "BandBroken2",
+    "Below",
+    "Bumps",
+    "ClampGlue",
+    "GlueGap",
+    "GlueResidue",
+    "GlueSeam",
+    "Hole",
+    "Label",
+    "Longer",
+    "Longer2",
+    "ResidualTape",
+    "Scrape",
+    "Scratch",
+    "Shorter",
+    "Tackless",
+    "Zigzag"
+  ],
+  "keep_empty_labels": false,
+  "copy_images": true,
+  "voc_split": {
+    "val_ratio": 0.2,
+    "test_ratio": 0.0,
+    "seed": 42
+  },
+  "output_dir": "../output/cam123-0820-obb",
+  "skip_prepare": false,
+  "prepare_only": false,
+  "train_project": "../runs",
+  "model_path": "yolo11m-obb.pt",
+  "device": "",
+  "train": {
+    "imgsz": 640,
+    "epochs": 200,
+    "batch": 16,
+    "patience": 30,
+    "workers": 4
+  }
+}

@@ -1,0 +1,13 @@
+keys/license_ed25519.pem
+config/license.json
+models/*.onnx
+models/*.onnx.enc
+models/*.key.json
+models/trt_cache/
+# Linux / macOS ORT 二进制（保留目录占位）
+third_party/onnxruntime/*
+!third_party/onnxruntime/.gitkeep
+# Windows ORT 二进制（与 Linux 隔离）
+third_party_win/onnxruntime/*
+!third_party_win/onnxruntime/.gitkeep
+dist/

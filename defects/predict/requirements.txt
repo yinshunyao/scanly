@@ -1,0 +1,10 @@
+fastapi>=0.110
+uvicorn>=0.27
+gradio>=4.44,<6
+ultralytics>=8.3
+opencv-python-headless>=4.8
+numpy>=1.24
+pillow>=10
+# 明文 .onnx：YOLO 导出经 Ultralytics 也依赖 ORT；RT-DETRv2 导出直接用 ORT
+onnxruntime>=1.18
+# GPU 机可改装：pip install onnxruntime-gpu（勿与 CPU 包并存）
