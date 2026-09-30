@@ -2,6 +2,8 @@
 
 ## 2026-09-30
 
+- 检测 core 路径脱敏：`rtdetrv2_pytorch`→`detect_core`，`train_rtdetrv2.py`→`train_core.py`，`test_rtdetrv2.py`→`test_core.py`；Scanly yaml 迁到 `configs/core/core_*_scanly.yml`。README 补充 pyfernet 加密/运行命令。
+
 - 训练配置解耦：公共数据 `train/train_detect_cfg/`，YOLO / RT-DETRv2 / OBB 超参分别在 `train_detect_yolo` / `train_detect_core` / `train_detect_obb`；入口脚本读 JSON，不再在 `__main__` 堆数据列表。
 - `convert_from_ls.py` 入口改为仅配置输入目录 + 输出目录；默认递归子目录收集 JSON/图像；LS 图名 `_` 可匹配本地空格文件名。
 
@@ -9,17 +11,17 @@
 
 - 新增 `defects/predict/predict_dir.py`：目录批量离线推理，输出画框图（`vis/`）与 Pascal VOC（`JPEGImages` + `Annotations`）。
 - Python 推理 `defects/predict` 支持明文 `.onnx`：YOLO 导出走 Ultralytics；RT-DETRv2 导出走 onnxruntime（`imgsz` / `class_names`）。`predict.json` 增加 `_readme` 说明 `infer_type` 与路径配对；依赖补充 `onnxruntime`。
-- `train_rtdetrv2.py` 默认骨干改为 RT-DETRv2-S（R18）；R34 / R50 配置保留为注释，改三行 `MODEL_YML`/`TUNING`/`TUNING_URL` 即可切换。`RUN_PREFIX` 默认 `rtdetrv2_r18`。
+- `train_core.py` 默认骨干改为 RT-DETRv2-S（R18）；R34 / R50 配置保留为注释，改三行 `MODEL_YML`/`TUNING`/`TUNING_URL` 即可切换。`run_prefix` 默认 `core_r18`。
 
 ## 2026-09-21
 
-- `train_rtdetrv2.py`：`fit` 结束后自动对 `best.pth`（无则 `last.pth`）先做 val，再在 `TEST_RATIO>0` 且 test 有图时做 test；指标写到该次 run 的 `val_metrics.json` / `test_metrics.json`。
+- `train_core.py`：`fit` 结束后自动对 `best.pth`（无则 `last.pth`）先做 val，再在 `TEST_RATIO>0` 且 test 有图时做 test；指标写到该次 run 的 `val_metrics.json` / `test_metrics.json`。
 
 ## 2026-09-14
 
-- 新增 `scanly/train/test_rtdetrv2.py`：对 RT-DETRv2 训练产出的 `.pth` / `.onnx` 做 test 划分 COCO mAP，写出 `test_metrics.json`。评估辅助函数放在测试脚本内，不依赖训练入口新增符号（现场只同步该文件即可 import）。写指标时按序列读取 COCO `stats`（numpy 数组不可用 `or []`）。
-- `train_rtdetrv2.py` 按现场 `prepare_dataset` 签名传参，兼容无 `test_ratio` 的旧副本。
-- 新增 `scanly/train/train_rtdetrv2.py`：RT-DETRv2 PyTorch 检测训练，数据配置对齐 `train.py`；实现自包含于 `scanly/train/rtdetrv2_pytorch/`。
+- 新增 `scanly/train/test_core.py`：对 RT-DETRv2 训练产出的 `.pth` / `.onnx` 做 test 划分 COCO mAP，写出 `test_metrics.json`。评估辅助函数放在测试脚本内，不依赖训练入口新增符号（现场只同步该文件即可 import）。写指标时按序列读取 COCO `stats`（numpy 数组不可用 `or []`）。
+- `train_core.py` 按现场 `prepare_dataset` 签名传参，兼容无 `test_ratio` 的旧副本。
+- 新增 `scanly/train/train_core.py`：RT-DETRv2 PyTorch 检测训练，数据配置对齐 `train.py`；实现自包含于 `scanly/train/detect_core/`。
 
 ## 2026-09-11
 

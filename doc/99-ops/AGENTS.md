@@ -23,4 +23,4 @@
 | `doc/02-dr/缺陷推理/` | 接口与模块设计 |
 | `defects/predict/` | Python 推理启动入口 `serve.py` |
 | `defects/predict_go/` | Go 推理启动入口 `cmd/server` |
-| `scanly/train/` | 训练启动入口 `train.py` / `train_rtdetrv2.py`；测试集验证 `test.py` / `test_rtdetrv2.py`；导出 `convert_2_onnx.py` |
+| `scanly/train/` | 训练启动入口 `train.py` / `train_core.py`；测试集验证 `test.py` / `test_core.py`；导出 `convert_2_onnx.py` |

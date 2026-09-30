@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""封边缺陷 RT-DETRv2：对已预处理数据集的测试集（默认）做 COCO mAP（.pth / .onnx）。"""
+"""封边缺陷检测 core：对已预处理数据集的测试集（默认）做 COCO mAP（.pth / .onnx）。"""
 from __future__ import annotations
 
 import contextlib
@@ -18,8 +18,8 @@ if str(_TRAIN_DIR) not in sys.path:
 
 from test import assert_split_ready, resolve_model_path  # noqa: E402
 from train import resolve_device, sync_data_yaml_path  # noqa: E402
-from train_rtdetrv2 import (  # noqa: E402
-    RTDETR_ROOT,
+from train_core import (  # noqa: E402
+    DETECT_CORE_ROOT,
     read_class_names,
     solver_device,
     yolo_split_to_coco,
@@ -314,7 +314,7 @@ def _ort_session(model_path: Path, device: str):
     except ImportError as exc:
         raise ImportError(
             "评估 ONNX 需要 onnxruntime；请安装 "
-            "scanly/train/rtdetrv2_pytorch/requirements.txt"
+            "scanly/train/detect_core/requirements.txt"
         ) from exc
 
     available = list(ort.get_available_providers())
@@ -486,9 +486,9 @@ def main(
     resolved_device = solver_device(device.strip() or resolve_device())
 
     prev_cwd = Path.cwd()
-    if str(RTDETR_ROOT) not in sys.path:
-        sys.path.insert(0, str(RTDETR_ROOT))
-    os.chdir(RTDETR_ROOT)
+    if str(DETECT_CORE_ROOT) not in sys.path:
+        sys.path.insert(0, str(DETECT_CORE_ROOT))
+    os.chdir(DETECT_CORE_ROOT)
     try:
         run_val(
             output_dir=output_dir,
@@ -509,10 +509,10 @@ def main(
 
 
 if __name__ == "__main__":
-    # /home/beyond/.conda/envs/yolo11/bin/python3 test_rtdetrv2.py > test_rtdetrv2.log 2>&1 &
+    # /home/beyond/.conda/envs/yolo11/bin/python3 test_core.py > test_core.log 2>&1 &
     TRAIN_DIR = Path(__file__).resolve().parent
 
-    # —— 数据 / 训练对齐 train_rtdetrv2.py ——
+    # —— 数据 / 训练对齐 train_core.py ——
     OUTPUT_DIR = TRAIN_DIR / "output" / "cam2-0911-1024-train"
     IMGSZ = 1024
     BATCH = 10
@@ -523,10 +523,10 @@ if __name__ == "__main__":
     SEED = 42
 
     # —— 权重与输出 ——
-    MODEL_PATH = TRAIN_DIR / "runs" / "rtdetrv2" / "best.pth"  # 或 best.onnx
-    MODEL_YML = RTDETR_ROOT / "configs" / "rtdetrv2" / "rtdetrv2_r50vd_scanly.yml"
+    MODEL_PATH = TRAIN_DIR / "runs" / "detect_core" / "best.pth"  # 或 best.onnx
+    MODEL_YML = DETECT_CORE_ROOT / "configs" / "core" / "core_r50vd_scanly.yml"
     TRAIN_PROJECT = TRAIN_DIR / "runs"
-    RUN_NAME = "rtdetrv2-test"
+    RUN_NAME = "detect_core-test"
 
     main(
         output_dir=OUTPUT_DIR,

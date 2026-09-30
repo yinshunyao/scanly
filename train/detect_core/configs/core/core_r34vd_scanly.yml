@@ -3,15 +3,15 @@ __include__: [
   '../runtime.yml',
   './include/dataloader.yml',
   './include/optimizer.yml',
-  './include/rtdetrv2_r50vd.yml',
+  './include/core_r50vd.yml',
 ]
 
 
-output_dir: ./output/rtdetrv2_r18vd_scanly
+output_dir: ./output/core_r34vd_scanly
 
 
 PResNet:
-  depth: 18
+  depth: 34
   freeze_at: -1
   freeze_norm: False
   pretrained: False
@@ -24,7 +24,7 @@ HybridEncoder:
 
 
 RTDETRTransformerv2:
-  num_layers: 3
+  num_layers: 4
 
 
 eval_spatial_size: [1024, 1024]

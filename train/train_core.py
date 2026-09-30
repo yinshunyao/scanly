@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""封边缺陷 RT-DETRv2 检测训练：数据准备与 train.py 对齐，再转 COCO 后训练。"""
+"""封边缺陷检测 core 训练：数据准备与 train.py 对齐，再转 COCO 后训练。"""
 from __future__ import annotations
 
 import inspect
@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tif", ".tiff"}
 SPLITS = ("train", "val", "test")
-RTDETR_ROOT = _TRAIN_DIR / "rtdetrv2_pytorch"
+DETECT_CORE_ROOT = _TRAIN_DIR / "detect_core"
 DEFAULT_TRAIN_CONFIG = _TRAIN_DIR / "train_detect_core" / "train_config.json"
 
 
@@ -193,7 +193,7 @@ def yolo_split_to_coco(
             for i, name in enumerate(class_names)
         ]
     return {
-        "info": {"description": "scanly rtdetrv2 from yolo staging"},
+        "info": {"description": "scanly detect_core from yolo staging"},
         "licenses": [],
         "images": images,
         "annotations": annotations,
@@ -333,7 +333,7 @@ def run_post_train_eval(
 ) -> None:
     """fit 结束后先 val、再按 TEST_RATIO 与 test 图像决定是否 test。延迟 import 避免循环依赖。"""
     sys.path.insert(0, str(_TRAIN_DIR))
-    from test_rtdetrv2 import run_val
+    from test_core import run_val
 
     logger.info("训练后评估：val split=%s ckpt=%s", val_split, checkpoint)
     run_val(
@@ -407,8 +407,8 @@ def run_train(
     weight_decay: float,
     test_ratio: float,
 ) -> None:
-    sys.path.insert(0, str(RTDETR_ROOT))
-    os.chdir(RTDETR_ROOT)
+    sys.path.insert(0, str(DETECT_CORE_ROOT))
+    os.chdir(DETECT_CORE_ROOT)
 
     from src.core import YAMLConfig
     from src.misc import dist_utils
@@ -499,7 +499,7 @@ def run_train(
         update["tuning"] = None
 
     logger.info(
-        "rtdetr: nc=%d imgsz=%d epochs=%d batch=%d device=%s amp=%s yml=%s tuning=%s output_dir=%s val_fitness_metric=%s patience=%d",
+        "detect_core: nc=%d imgsz=%d epochs=%d batch=%d device=%s amp=%s yml=%s tuning=%s output_dir=%s val_fitness_metric=%s patience=%d",
         len(names),
         imgsz,
         epochs,
@@ -679,7 +679,7 @@ def main_from_config(
         skip_prepare=bool(cfg.get("skip_prepare", False)),
         prepare_only=bool(cfg.get("prepare_only", False)),
         train_project=Path(str(cfg.get("train_project") or (_TRAIN_DIR / "runs"))),
-        run_prefix=str(cfg.get("run_prefix") or "rtdetrv2"),
+        run_prefix=str(cfg.get("run_prefix") or "detect_core"),
         model_yml=Path(str(cfg["model_yml"])),
         tuning_path=tuning_path,
         tuning_url=str(cfg.get("tuning_url") or ""),
@@ -708,5 +708,5 @@ if __name__ == "__main__":
     multiprocessing.freeze_support()
     CONFIG_PATH = str(DEFAULT_TRAIN_CONFIG)
     TEST_ONLY = False
-    RESUME = None  # 例如 "runs/rtdetrv2_r18/last.pth"
+    RESUME = None  # 例如 "runs/core_r18/last.pth"
     main_from_config(CONFIG_PATH, test_only=TEST_ONLY, resume=RESUME)

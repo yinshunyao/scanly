@@ -12,8 +12,8 @@ YOLO11 检测有独立入口 `scanly/train/test.py`，对已划分的 test 集�
 
 ## 功能性要求
 
-1. **入口**：`scanly/train/test_rtdetrv2.py`。参数放在 `__main__` 变量区，不强制 argparse。
-2. **数据**：复用已预处理的 YOLO 检测目录（`OUTPUT_DIR`），与 `train_rtdetrv2.py` 相同的 COCO 转换与 `SINGLE_CLS` 语义。默认评估 `SPLIT=test`；可改为 `val`。无对应划分或图像为空时报错，提示 `TEST_RATIO>0` 后重新准备。
+1. **入口**：`scanly/train/test_core.py`。参数放在 `__main__` 变量区，不强制 argparse。
+2. **数据**：复用已预处理的 YOLO 检测目录（`OUTPUT_DIR`），与 `train_core.py` 相同的 COCO 转换与 `SINGLE_CLS` 语义。默认评估 `SPLIT=test`；可改为 `val`。无对应划分或图像为空时报错，提示 `TEST_RATIO>0` 后重新准备。
 3. **权重**：`MODEL_PATH` 为训练产出的 `.pth`（如 `best.pth`）或同目录导出的 `.onnx`。相对路径相对 `scanly/train/`。文件不存在则报错。YOLO `.pt` 须提示改用 `test.py`。
 4. **架构配置**：`.pth` 评估须指定与训练一致的 `MODEL_YML`、`IMGSZ`、`SINGLE_CLS`。`.onnx` 预处理与训练 val 一致（`imgsz` 方形 resize、像素 /255）。
 5. **指标**：COCO bbox AP（AP、AP50、AP75、AR100）及每类 AP50 / AP50-95。日志打印 mAP50 / mAP50-95；结果写入 `{TRAIN_PROJECT}/{RUN_NAME}/test_metrics.json`。默认 `RUN_NAME` 带 `-test` 后缀，不覆盖训练 run。
@@ -23,7 +23,7 @@ YOLO11 检测有独立入口 `scanly/train/test.py`，对已划分的 test 集�
 
 1. 不 import scanly 以外工程目录中的训练实现。
 2. 不改推理服务、不走 YOLO 加密导出链路。
-3. 本版不要求可视化 plots；不替代 `train_rtdetrv2.py` 的 `TEST_ONLY` val。训练 `fit` 结束后的自动 val/test 见检测训练 OR，本入口负责事后补评。
+3. 本版不要求可视化 plots；不替代 `train_core.py` 的 `TEST_ONLY` val。训练 `fit` 结束后的自动 val/test 见检测训练 OR，本入口负责事后补评。
 
 # 当前工作项
 
@@ -31,7 +31,7 @@ YOLO11 检测有独立入口 `scanly/train/test.py`，对已划分的 test 集�
 
 ## 需求
 
-- 新增 `test_rtdetrv2.py`：对 RT-DETRv2 `.pth` / `.onnx` 做测试集 COCO 评估
+- 新增 `test_core.py`：对 RT-DETRv2 `.pth` / `.onnx` 做测试集 COCO 评估
 
 ## 问题
 

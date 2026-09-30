@@ -1,6 +1,6 @@
 # train_detect_cfg
 
-检测训练共用数据源与类别表。YOLO（`train_detect_yolo`）/ RT-DETRv2（`train_detect_core`）/ OBB（`train_detect_obb`）overlay 本目录，不在各入口再写一份源路径与 `train_classes`。训练超参在各入口 `train_config.json`。
+检测训练共用数据源与类别表。YOLO（`train_detect_yolo`）/ 检测 core（`train_detect_core`）/ OBB（`train_detect_obb`）overlay 本目录，不在各入口再写一份源路径与 `train_classes`。训练超参在各入口 `train_config.json`。
 
 ## 文件
 

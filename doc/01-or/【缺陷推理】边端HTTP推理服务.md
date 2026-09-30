@@ -36,7 +36,7 @@
 10. **模型目录**：权重默认放在 `scanly/defects/predict/models/`。`predict.json` 的 `model_path` / `obb_model_path` 写文件名或相对路径时，相对该目录解析（如 `"obb_model_path": "cam2-0819.pt"` → `models/cam2-0819.pt`）；绝对路径仍按原路径加载。
 11. **ONNX 权重**：Python 服务须能加载明文 `.onnx`（不接 Go 加密链路）。支持两类：
     - **YOLO 导出**（`convert_2_onnx.py` / Ultralytics export）：经 Ultralytics 加载，`infer_type` 仍为 `detect` / `obb`。
-    - **RT-DETRv2 导出**（`train_rtdetrv2.py` → `images` + `orig_target_sizes` → `labels/boxes/scores`）：仅轴对齐检测，对应 `infer_type=detect`；须可配 `imgsz`（与训练一致）与 `class_names`（缺省单类 `defect`）。
+    - **RT-DETRv2 导出**（`train_core.py` → `images` + `orig_target_sizes` → `labels/boxes/scores`）：仅轴对齐检测，对应 `infer_type=detect`；须可配 `imgsz`（与训练一致）与 `class_names`（缺省单类 `defect`）。
 12. **配置可读性**：`predict.json` 须带字段备注（如 `_readme`），至少说明 `infer_type` 与 `model_path` / `obb_model_path` 如何配对，避免误配。
 13. **目录批量离线推理**：提供本地脚本，对指定图像目录整批推理；输出目录含画框图与 Pascal VOC（`JPEGImages` + `Annotations`/*.xml，可选 `predefined_classes.txt`），便于 LabelImg 复核。入口用 `__main__` 变量配置路径，不强制 CLI。
 

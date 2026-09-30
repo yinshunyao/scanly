@@ -207,8 +207,8 @@ class BaseSolver(object):
         sample = ", ".join((struct_unmatched + struct_missed)[:8])
         raise RuntimeError(
             "tuning 与模型结构不匹配（unmatched_struct={} missed_struct={}）。"
-            "请确认 model_yml 与预训练同骨干：rtdetrv2_r50vd_6x_coco_ema.pth 须用 "
-            "configs/rtdetrv2/rtdetrv2_r50vd_scanly.yml（不要用 r34/r18 或 r50vd_m）。"
+            "请确认 model_yml 与预训练同骨干：R50 权重须用 "
+            "configs/core/core_r50vd_scanly.yml（不要用 r34/r18 或 r50vd_m）。"
             " 样例: {}".format(len(struct_unmatched), len(struct_missed), sample)
         )
 
