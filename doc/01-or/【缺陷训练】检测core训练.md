@@ -9,6 +9,7 @@
 3. 将已准备的 YOLO 检测目录转为 COCO json 后启动 RT-DETRv2 训练，写出 checkpoint。
 4. 将 RT-DETRv2 基础实现复制到 scanly 新目录自包含复用，不引用仓库内其他工程的训练代码。
 5. 训练正常结束后自动给出 val 指标；若已划分 test（`TEST_RATIO>0`）再给出 test 指标。
+6. test 评估把画框图写到该次 core 训练目录，并给出推理时延。
 
 # 要求
 
@@ -17,9 +18,12 @@
 1. **数据配置对齐 `train.py`**：入口暴露相同数据项：`SOURCE_DATA_ROOT` / `VOC_XML_PATH`、`TRAIN_CLASSES`、`OUTPUT_DIR`、`SKIP_PREPARE`、`PREPARE_ONLY`、`VAL_RATIO`、`TEST_RATIO`、`SEED`、`KEEP_EMPTY_LABELS`、`COPY_IMAGES`、`SINGLE_CLS`。数据准备调用现有 `prepare_dataset.py`（`label_format=detect`），写出 YOLO 检测目录后再转 COCO。
 2. **类别**：`TRAIN_CLASSES` 顺序即 class id（从 0）。`SINGLE_CLS=True` 时不改写已预处理 YOLO 标签，仅在转 COCO 时把全部框视为一类。
 3. **训练入口**：`scanly/train/train_core.py`。参数放在 `__main__` 变量区，不强制 argparse。可只准备数据、不训练。
-4. **模型实现**：基础代码复制到 `scanly/train/detect_core/`（src、官方 configs、依赖声明）。训练通过该目录内 YAML + solver 启动。默认骨干 RT-DETRv2-L（ResNet-50），可用配置切换 R18 / R34；从 COCO 检测预训练微调，不再下载 ImageNet backbone。
+4. **模型实现**：基础代码复制到 `scanly/train/detect_core/`（src、官方 configs、依赖声明）。训练通过该目录内 YAML + solver 启动。默认骨干 RT-DETRv2-L（ResNet-50）。切换 R18 / R34 / R50 只改入口 `backbone`，训练 yaml 自动关联 `configs/core/core_<骨干>vd_scanly.yml`，不必再写 yaml 路径。预训练权重路径与下载地址仍按骨干填写。从 COCO 检测预训练微调，不再下载 ImageNet backbone。
 5. **输出**：权重写到 `scanly/train/runs/` 下独立 run 目录（如 `rtdetrv2` / `rtdetrv2_2`…），不覆盖已有目录。默认 `EPOCHS=200`、`PATIENCE=25`（val 指标连续不升高则早停）。可选在训练结束后导出同目录 ONNX（本需求不要求接入现有 YOLO 加密导出）。
-6. **验证**：训练入口提供只评估开关（`TEST_ONLY`，加载已有 checkpoint 做 **val**，不跑 test）。`fit` 正常结束后须自动再评估：先用最优权重（优先 `best.pth`，否则 `last.pth`）做 val；若开启导出 ONNX，则在确认最优权重后先导出同目录 `.onnx`，再对 test 评估（优先用该 ONNX；未导出则回退 `.pth`）。仅当 `TEST_RATIO>0` 且 `images/test` 有图时跑 test。指标写入该次 run 目录。事后补评仍用独立入口，见 `scanly/doc/01-or/【缺陷训练】检测core测试集验证.md`。无 checkpoint 时跳过训练后评估与 ONNX，并打警告。`TEST_RATIO>0` 但 test 无图时跳过 test、不失败。
+6. **选模类别**：公共配置 `val_classes` 非空时，检测 core 只用这些类的不加权平均计算 val fitness，并据此保存 `best.pth` 和早停。名字须是训练类别的子集。空列表按全部评估类别。全体 COCO 指标和按类指标仍然写出。`single_cls=true` 时不允许填写 `val_classes`。
+7. **验证**：训练入口提供只评估开关（`TEST_ONLY`，加载已有 checkpoint 做 **val**，不跑 test）。`fit` 正常结束后须自动再评估：先用最优权重（优先 `best.pth`，否则 `last.pth`）做 val；若开启导出 ONNX，则在确认最优权重后先导出同目录 `.onnx`，再对 test 评估（优先用该 ONNX；未导出则回退 `.pth`）。仅当 `TEST_RATIO>0` 且 `images/test` 有图时跑 test。指标写入该次 run 目录。事后补评仍用独立入口，见 `scanly/doc/01-or/【缺陷训练】检测core测试集验证.md`。无 checkpoint 时跳过训练后评估与 ONNX，并打警告。`TEST_RATIO>0` 但 test 无图时跳过 test、不失败。
+8. **test 画框**：上述 test 评估默认把画框图写到该次 core run 目录的 `vis/`（绿为对上的预测，红为多出来的预测，橙为漏掉的真值，框旁有类名和置信度）。`save_vis=false` 时不画。`vis_conf` / `vis_iou` 只影响画图，不影响 mAP。val 不画图。
+9. **test 推理时延**：同一次 test 评估统计推理时延（不含读图、画框、写文件和指标汇总），写入该次 run 的 `test_metrics.json` 并在日志输出均值、中位数、P95、最小和最大。调用多于一次时第一次不计入。`save_vis=false` 时仍然统计。val 不计。
 
 ## 非功能性要求
 
@@ -36,6 +40,10 @@
 
 - 新增 RT-DETRv2 torch 训练：复制自包含实现到 `scanly/train/detect_core/`，入口对齐 `train.py` 数据配置
 - 训练结束后自动 val；开启 `export_onnx` 时先导出最优 ONNX，再按 `TEST_RATIO>0` 用 ONNX（否则 `.pth`）做 test 评估
+- 换骨干只写 `backbone`（`r18` / `r34` / `r50`），训练 yaml 自动关联，入口不再手写 `model_yml`
+- 检测 core 按 `val_classes` 选 `best.pth`：只平均列表中的类；全体指标仍保留
+- test 评估画框写到该次 core run 目录的 `vis/`；`save_vis` 可关，val 不画
+- test 评估写入推理时延（`test_metrics.json` 与日志）；val 不计
 
 ## 问题
 

@@ -580,14 +580,18 @@ def collect_voc_samples(
     *,
     keep_empty_labels: bool,
     label_format: LabelFormat = "detect",
+    check_unknown: bool = True,
+    subset_for: Any = None,
+    stem_prefix_for: Any = None,
 ) -> tuple[list[SampleRecord], dict[str, int], list[str]]:
     available = collect_available_voc_classes(voc_roots)
-    unknown = [name for name in train_classes if name not in available]
-    if unknown:
-        raise ValueError(
-            "TRAIN_CLASSES 含原始数据中不存在的类别: "
-            f"{unknown}；可用类别: {available}"
-        )
+    if check_unknown:
+        unknown = [name for name in train_classes if name not in available]
+        if unknown:
+            raise ValueError(
+                "TRAIN_CLASSES 含原始数据中不存在的类别: "
+                f"{unknown}；可用类别: {available}"
+            )
     name_to_new_id = {name: idx for idx, name in enumerate(train_classes)}
     multi = len(voc_roots) > 1
     samples: list[SampleRecord] = []
@@ -639,11 +643,22 @@ def collect_voc_samples(
             if not lines and not keep_empty_labels:
                 totals["skipped_empty"] += 1
                 continue
+            prefix = stem_prefix_for(voc_root) if stem_prefix_for else None
+            if prefix:
+                safe = str(prefix).replace("/", "__").replace("\\", "__")
+                out_stem = f"{safe}__{image_path.stem}"
+            else:
+                out_stem = _out_stem(voc_root, source_root, image_path, multi)
+            subset = (
+                str(subset_for(voc_root))
+                if subset_for
+                else _subset_key(voc_root, source_root)
+            )
             samples.append(
                 SampleRecord(
-                    subset=_subset_key(voc_root, source_root),
+                    subset=subset,
                     image_path=image_path,
-                    out_stem=_out_stem(voc_root, source_root, image_path, multi),
+                    out_stem=out_stem,
                     lines=lines,
                     box_counts=box_counts,
                 )
@@ -654,12 +669,48 @@ def collect_voc_samples(
     return samples, totals, available
 
 
+def _split_counts(n: int, val_ratio: float, test_ratio: float) -> tuple[int, int]:
+    n_test = int(round(n * test_ratio)) if test_ratio > 0 else 0
+    n_val = int(round(n * val_ratio)) if val_ratio > 0 else 0
+
+    if n_test + n_val >= n:
+        overflow = n_test + n_val - max(0, n - 1)
+        while overflow > 0 and n_val > 0:
+            n_val -= 1
+            overflow -= 1
+        while overflow > 0 and n_test > 0:
+            n_test -= 1
+            overflow -= 1
+
+    if val_ratio > 0 and n >= 2 and n_val == 0 and n_test < n - 1:
+        n_val = 1
+    if test_ratio > 0 and n >= 3 and n_test == 0 and n_val + 1 < n:
+        n_test = 1
+    return n_val, n_test
+
+
+def _split_group(
+    items: list[SampleRecord],
+    *,
+    val_ratio: float,
+    test_ratio: float,
+    rng: random.Random,
+) -> tuple[list[SampleRecord], list[SampleRecord], list[SampleRecord]]:
+    rng.shuffle(items)
+    n_val, n_test = _split_counts(len(items), val_ratio, test_ratio)
+    test = items[:n_test]
+    val = items[n_test : n_test + n_val]
+    train = items[n_test + n_val :]
+    return train, val, test
+
+
 def split_samples(
     samples: list[SampleRecord],
     *,
     val_ratio: float,
     test_ratio: float = 0.0,
     seed: int,
+    split_each_dir: bool = True,
 ) -> tuple[list[SampleRecord], list[SampleRecord], list[SampleRecord]]:
     if val_ratio < 0 or test_ratio < 0:
         raise ValueError("VAL_RATIO / TEST_RATIO 不能为负")
@@ -669,6 +720,14 @@ def split_samples(
         return list(samples), [], []
 
     rng = random.Random(seed)
+    if not split_each_dir:
+        return _split_group(
+            list(samples),
+            val_ratio=val_ratio,
+            test_ratio=test_ratio,
+            rng=rng,
+        )
+
     grouped: dict[str, list[SampleRecord]] = {}
     for sample in samples:
         grouped.setdefault(sample.subset, []).append(sample)
@@ -677,29 +736,137 @@ def split_samples(
     val: list[SampleRecord] = []
     test: list[SampleRecord] = []
     for items in grouped.values():
-        rng.shuffle(items)
-        n = len(items)
-        n_test = int(round(n * test_ratio)) if test_ratio > 0 else 0
-        n_val = int(round(n * val_ratio)) if val_ratio > 0 else 0
-
-        if n_test + n_val >= n:
-            overflow = n_test + n_val - max(0, n - 1)
-            while overflow > 0 and n_val > 0:
-                n_val -= 1
-                overflow -= 1
-            while overflow > 0 and n_test > 0:
-                n_test -= 1
-                overflow -= 1
-
-        if val_ratio > 0 and n >= 2 and n_val == 0 and n_test < n - 1:
-            n_val = 1
-        if test_ratio > 0 and n >= 3 and n_test == 0 and n_val + 1 < n:
-            n_test = 1
-
-        test.extend(items[:n_test])
-        val.extend(items[n_test : n_test + n_val])
-        train.extend(items[n_test + n_val :])
+        part_train, part_val, part_test = _split_group(
+            items,
+            val_ratio=val_ratio,
+            test_ratio=test_ratio,
+            rng=rng,
+        )
+        train.extend(part_train)
+        val.extend(part_val)
+        test.extend(part_test)
     return train, val, test
+
+
+def _configured_dir_keys(paths: list[Path]) -> dict[Path, str]:
+    """配置目录 → 不冲突的短名，用于划分分组和输出文件名前缀。"""
+    names = [path.name for path in paths]
+    keys: dict[Path, str] = {}
+    used: dict[str, int] = {}
+    for path, name in zip(paths, names):
+        key = f"{path.parent.name}__{name}" if names.count(name) > 1 else name
+        seen = used.get(key, 0)
+        used[key] = seen + 1
+        if seen:
+            key = f"{key}__{seen + 1}"
+        keys[path] = key
+    return keys
+
+
+def _dedupe_resolved(paths: list[Path]) -> list[Path]:
+    seen: set[Path] = set()
+    out: list[Path] = []
+    for path in paths:
+        resolved = path.expanduser().resolve()
+        if resolved in seen:
+            raise ValueError(f"voc_xml_path 含重复目录: {resolved}")
+        seen.add(resolved)
+        out.append(resolved)
+    return out
+
+
+def _empty_totals() -> dict[str, int]:
+    return {
+        "label_files": 0,
+        "skipped_no_image": 0,
+        "skipped_empty": 0,
+        "kept": 0,
+        "dropped_class": 0,
+        "dropped_invalid": 0,
+        "bbox": 0,
+        "polygon": 0,
+        "obb4": 0,
+    }
+
+
+def _add_totals(dst: dict[str, int], src: dict[str, int]) -> None:
+    for key, value in src.items():
+        dst[key] = dst.get(key, 0) + int(value)
+
+
+def _collect_voc_path_list(
+    voc_paths: list[Path],
+    train_classes: list[str],
+    *,
+    keep_empty_labels: bool,
+    label_format: LabelFormat,
+) -> tuple[list[SampleRecord], dict[str, int], list[str], list[Path], list[str]]:
+    """多项 VOC：每项单独发现。样本 ``subset`` 为该配置目录，供分目录划分。"""
+    paths = _dedupe_resolved(voc_paths)
+    groups: list[tuple[Path, list[Path]]] = []
+    for path in paths:
+        if not path.is_dir():
+            raise FileNotFoundError(f"原始数据集目录不存在: {path}")
+        roots = discover_voc_roots(path)
+        if not roots:
+            raise FileNotFoundError(
+                "未找到扁平 VOC（需含 JPEGImages/、Annotations/）: "
+                f"{path}"
+            )
+        groups.append((path, roots))
+
+    all_roots = [root for _, roots in groups for root in roots]
+    available = collect_available_voc_classes(all_roots)
+    names = [str(x).strip() for x in train_classes if str(x).strip()]
+    if not names:
+        names = list(available)
+        if not names:
+            raise ValueError("原始数据中没有可用类别")
+        logger.info("TRAIN_CLASSES 为空，使用全部可用类别: %s", names)
+    else:
+        unknown = [name for name in names if name not in available]
+        if unknown:
+            raise ValueError(
+                "TRAIN_CLASSES 含原始数据中不存在的类别: "
+                f"{unknown}；可用类别: {available}"
+            )
+
+    dir_keys = _configured_dir_keys(paths)
+    samples: list[SampleRecord] = []
+    totals = _empty_totals()
+
+    for configured, roots in groups:
+        group_key = dir_keys[configured]
+
+        def subset_for(_voc_root: Path, _key: str = group_key) -> str:
+            return _key
+
+        def stem_prefix_for(
+            voc_root: Path,
+            _configured: Path = configured,
+            _key: str = group_key,
+        ) -> str | None:
+            if voc_root.resolve() == _configured.resolve():
+                return _key
+            inner = _subset_key(voc_root, _configured).replace("/", "__").replace("\\", "__")
+            return f"{_key}__{inner}"
+
+        part, part_totals, _available = collect_voc_samples(
+            roots,
+            configured,
+            names,
+            keep_empty_labels=keep_empty_labels,
+            label_format=label_format,
+            check_unknown=False,
+            subset_for=subset_for,
+            stem_prefix_for=stem_prefix_for,
+        )
+        samples.extend(part)
+        _add_totals(totals, part_totals)
+
+    if not samples:
+        raise ValueError("按 TRAIN_CLASSES 过滤后没有可用样本")
+    return samples, totals, available, all_roots, names
 
 
 def write_data_yaml(
@@ -773,11 +940,15 @@ def prepare_dataset(
     keep_empty_labels: bool = False,
     copy_images: bool = True,
     label_format: LabelFormat = "detect",
+    voc_paths: list[str | Path] | None = None,
+    split_each_dir: bool = True,
 ) -> dict[str, Any]:
     """按配置类别过滤原始导出包或扁平 VOC，写出 YOLO11 检测或 OBB 训练目录。
 
     train_classes 为空时，自动使用原始数据中 classes.txt / predefined_classes.txt 的全部类别。
-    val_ratio / test_ratio 为各子集内占总样本的比例，三者之和须小于 1。
+    val_ratio / test_ratio 为划分比例，二者之和须小于 1。
+    ``voc_paths`` 多于一项时按配置目录合并；``split_each_dir`` 为真时每个目录单独划分再合并，
+    为假时全部样本打乱后一次划分。单项 VOC / YOLO 在开关为真时仍按发现到的子包分层。
     """
     if label_format not in {"detect", "obb"}:
         raise ValueError(f"不支持的 label_format: {label_format}")
@@ -788,40 +959,67 @@ def prepare_dataset(
 
     source_root = Path(source_root).resolve()
     output_dir = Path(output_dir)
-    if output_dir.resolve() == source_root:
+    configured = _dedupe_resolved([Path(p) for p in voc_paths]) if voc_paths else []
+    if len(configured) == 1:
+        source_root = configured[0]
+    if len(configured) <= 1 and output_dir.resolve() == source_root:
         raise ValueError(
             f"OUTPUT_DIR 不能与原始数据根相同（会污染源目录）: {source_root}"
         )
 
-    source_kind, subsets = discover_source(source_root)
-    if source_kind == "yolo":
-        available_fn = collect_available_classes
-        collect_fn = collect_samples
-    else:
-        available_fn = collect_available_voc_classes
-        collect_fn = collect_voc_samples
-        if output_dir.resolve() in {p.resolve() for p in subsets}:
+    source_roots: list[str] | None = None
+    if len(configured) > 1:
+        samples, totals, available, subsets, names = _collect_voc_path_list(
+            configured,
+            names,
+            keep_empty_labels=keep_empty_labels,
+            label_format=label_format,
+        )
+        banned = {path.resolve() for path in subsets} | set(configured)
+        if output_dir.resolve() in banned:
             raise ValueError(
-                f"OUTPUT_DIR 不能与 VOC 源目录相同（会污染 JPEGImages/Annotations）: {output_dir}"
+                "OUTPUT_DIR 不能与 VOC 源目录相同（会污染 JPEGImages/Annotations）: "
+                f"{output_dir}"
             )
+        source_kind = "voc"
+        source_root = configured[0]
+        source_roots = [str(path) for path in configured]
+        logger.info(
+            "VOC 多目录 %s 个，split_each_dir=%s",
+            len(configured),
+            split_each_dir,
+        )
+    else:
+        source_kind, subsets = discover_source(source_root)
+        if source_kind == "yolo":
+            available_fn = collect_available_classes
+            collect_fn = collect_samples
+        else:
+            available_fn = collect_available_voc_classes
+            collect_fn = collect_voc_samples
+            if output_dir.resolve() in {p.resolve() for p in subsets}:
+                raise ValueError(
+                    f"OUTPUT_DIR 不能与 VOC 源目录相同（会污染 JPEGImages/Annotations）: {output_dir}"
+                )
 
-    if not names:
-        names = available_fn(subsets)
         if not names:
-            raise ValueError("原始数据中没有可用类别")
-        logger.info("TRAIN_CLASSES 为空，使用全部可用类别: %s", names)
-    samples, totals, available = collect_fn(
-        subsets,
-        source_root,
-        names,
-        keep_empty_labels=keep_empty_labels,
-        label_format=label_format,
-    )
+            names = available_fn(subsets)
+            if not names:
+                raise ValueError("原始数据中没有可用类别")
+            logger.info("TRAIN_CLASSES 为空，使用全部可用类别: %s", names)
+        samples, totals, available = collect_fn(
+            subsets,
+            source_root,
+            names,
+            keep_empty_labels=keep_empty_labels,
+            label_format=label_format,
+        )
     train_samples, val_samples, test_samples = split_samples(
         samples,
         val_ratio=val_ratio,
         test_ratio=test_ratio,
         seed=seed,
+        split_each_dir=split_each_dir,
     )
     if not train_samples:
         raise ValueError("划分后训练集为空，请降低 VAL_RATIO / TEST_RATIO")
@@ -848,12 +1046,16 @@ def prepare_dataset(
     if empty_classes:
         logger.warning("配置的类别在过滤后没有框: %s", empty_classes)
 
+    subset_labels: list[str] = []
+    for sample in samples:
+        if sample.subset not in subset_labels:
+            subset_labels.append(sample.subset)
     stats: dict[str, Any] = {
         "source_root": str(source_root.resolve()),
         "output_dir": str(output_dir.resolve()),
         "source_kind": source_kind,
         "label_format": label_format,
-        "subsets": [_subset_key(p, source_root) for p in subsets],
+        "subsets": subset_labels,
         "available_classes": available,
         "train_classes": names,
         "images_train": len(train_samples),
@@ -872,7 +1074,10 @@ def prepare_dataset(
         "val_ratio": val_ratio,
         "test_ratio": test_ratio,
         "seed": seed,
+        "split_each_dir": split_each_dir,
     }
+    if source_roots:
+        stats["source_roots"] = source_roots
     (output_dir / "stats.json").write_text(
         json.dumps(stats, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",

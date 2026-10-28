@@ -22,10 +22,10 @@ pip install -r scanly/defects/predict/requirements.txt
 
 | 目标 | `infer_type` | 权重 |
 |:---|:---|:---|
-| 轴对齐检测（YOLO / RT-DETRv2） | `detect` | `model_path` → `.pt` 或明文 `.onnx` |
+| 轴对齐检测（YOLO / RT-DETRv2 / 检测 mark `.pth`） | `detect` | `model_path` → `.pt`、明文 `.onnx` 或训练检查点 `.pth` |
 | 旋转框（仅 YOLO-OBB） | `obb`（也可省略，默认） | `obb_model_path`；或只配 `model_path` 且留空 `obb_model_path` |
 
-`infer_type` 选的是**任务类型**，不是文件后缀。RT-DETRv2 训练导出的 `.onnx`（输入 `images`+`orig_target_sizes`）只能 `detect`，并配 `imgsz`（与训练一致，常见 `1024`）、`class_names`（单类默认 `["defect"]`）。YOLO 经 Ultralytics/`convert_2_onnx` 导出的 `.onnx` 仍按 detect/obb 走 Ultralytics。加密 `.onnx.enc` 仍用 Go 服务，本 Python 入口不解密。
+`infer_type` 选的是**任务类型**，不是文件后缀。RT-DETRv2 训练导出的 `.onnx`（输入 `images`+`orig_target_sizes`）只能 `detect`，并配 `imgsz`（与训练一致，常见 `1024`）、`class_names`（单类默认 `["defect"]`）。检测 mark 的 `.pth` 也只能 `detect`：`imgsz` 与训练边长一致，类名优先读检查点（本版 `GlueSeam`、`Tackless`、`ResidualTape`）。YOLO 经 Ultralytics/`convert_2_onnx` 导出的 `.onnx` 仍按 detect/obb 走 Ultralytics。加密 `.onnx.enc` 仍用 Go 服务，本 Python 入口不解密。加载 `.pth` 需要 `rfdetr`；机器上已有 CUDA 版 torch 时不要重装 torch。
 
 `model_path` / `obb_model_path` 都可空：服务能起来，但对应类型的预测与 `/health/ready` 会显示未就绪。相对路径相对 `models/` 解析；绝对路径原样。
 
@@ -71,6 +71,15 @@ python scanly/defects/predict/serve.py
 | `http://<host>:37870/health/ready` | 就绪 |
 
 日志走 stdout/stderr。后台建议：`nohup python serve.py > web.log 2>&1 &`。
+
+4090D 部署目录是 `/root/autodl-tmp/scanly/defects/predict`。这台机器对外只映射 `6008`，端口写在 `predict.json` 的 `port`（`serve.py` 里 `SERVER_PORT` 为空时用该值）。当前权重是 RT-DETRv2 导出的 `3.3.1.onnx`，放在 `/root/autodl-tmp/models/`，`model_path` 写该绝对路径，`class_names` 顺序为 GlueSeam、Tackless、GlueGap，`imgsz=1024`。检测 mark 的 `.pth` 仍可配绝对路径，但不要把 core 的 `best.pth` 当成 mark 检查点。`.venv` 为 `--system-site-packages`，沿用机器上已有的 CUDA 版 torch，不另装 torch。RT-DETRv2 ONNX 走 onnxruntime；没有 CUDAExecutionProvider 时会回退 CPU。启动：
+
+```bash
+cd /root/autodl-tmp/scanly/defects/predict
+nohup .venv/bin/python -u serve.py >> serve-v331.log 2>&1 &
+```
+
+连接信息见 `study/配置信息/云服务重要信息.md` 的 4090D 一节。训练进程在同一张卡上时不要停掉训练。只重启推理时，结束的是该目录下的 `serve.py`，不要动 `train_core.py`。
 
 ## 与边端同机约定
 

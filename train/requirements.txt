@@ -7,3 +7,5 @@ onnx>=1.12.0,<2.0.0
 onnxslim>=0.1.71
 onnxruntime>=1.16
 # 检测 core：另装 scanly/train/detect_core/requirements.txt
+# 检测 mark（Python>=3.10）。train 含训练所需依赖，loggers 含训练日志
+rfdetr[train,loggers]>=1.11.2

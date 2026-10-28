@@ -25,7 +25,12 @@ def export_to_onnx(
     simplify: bool = False,
     opset_version: int = 16,
 ) -> Path:
-    """将 cfg.model 导出为 ONNX。有 checkpoint 时先加载（优先 EMA）。"""
+    """将 cfg.model 导出为 ONNX。有 checkpoint 时先加载（优先 EMA）。
+
+    导出用 batch=1；虽写了 ``dynamic_axes``，HybridEncoder 内
+    ``nn.MultiheadAttention`` 仍会把部分 Reshape 写成 batch=1 常量。
+    推理 / ``test_core`` 评估必须 batch=1，否则 ORT 报 node_view Reshape 失败。
+    """
     import torch
     import torch.nn as nn
 
@@ -58,14 +63,12 @@ def export_to_onnx(
 
     wrapped = _DeployModel(model, post).eval()
     size_i = int(input_size)
+    # 必须与推理侧一致：batch=1。勿改为 >1 再声明 dynamic——MHA 仍会写死该 batch。
     data = torch.rand(1, 3, size_i, size_i)
     size = torch.tensor([[size_i, size_i]])
     _ = wrapped(data, size)
 
-    torch.onnx.export(
-        wrapped,
-        (data, size),
-        str(out_path),
+    export_kw = dict(
         input_names=["images", "orig_target_sizes"],
         output_names=["labels", "boxes", "scores"],
         dynamic_axes={
@@ -76,6 +79,12 @@ def export_to_onnx(
         verbose=False,
         do_constant_folding=True,
     )
+    try:
+        torch.onnx.export(
+            wrapped, (data, size), str(out_path), dynamo=False, **export_kw
+        )
+    except TypeError:
+        torch.onnx.export(wrapped, (data, size), str(out_path), **export_kw)
 
     if check:
         import onnx

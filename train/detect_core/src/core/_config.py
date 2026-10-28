@@ -71,6 +71,7 @@ class BaseConfig(object):
         self.summary_dir :str = None
         self.device : str = ''
         self.val_fitness_metric : str = 'ap50'
+        self.val_classes : list = None
         self.patience : int = 0
 
     @property

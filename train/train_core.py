@@ -7,6 +7,7 @@ import inspect
 import json
 import logging
 import os
+import re
 import sys
 import urllib.request
 from pathlib import Path
@@ -20,7 +21,9 @@ from train_detect_cfg.prepare_dataset import prepare_dataset  # noqa: E402
 from train import assert_prepared_dataset, resolve_device, sync_data_yaml_path  # noqa: E402
 from train_detect_cfg.load_cfg import (  # noqa: E402
     load_merged_cfg,
-    resolve_source_root,
+    resolve_prepare_source,
+    resolve_val_classes,
+    split_each_dir_enabled,
     split_ratios,
 )
 
@@ -30,6 +33,12 @@ IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tif", ".tiff"}
 SPLITS = ("train", "val", "test")
 DETECT_CORE_ROOT = _TRAIN_DIR / "detect_core"
 DEFAULT_TRAIN_CONFIG = _TRAIN_DIR / "train_detect_core" / "train_config.json"
+_CORE_YML_BY_BACKBONE = {
+    "r18": "core_r18vd_scanly.yml",
+    "r34": "core_r34vd_scanly.yml",
+    "r50": "core_r50vd_scanly.yml",
+}
+_BACKBONE_TOKEN = re.compile(r"(?<![A-Za-z0-9])(r18|r34|r50)(?![0-9])")
 
 
 def _line_buffer_stdio() -> None:
@@ -332,11 +341,17 @@ def run_post_train_eval(
     val_split: str,
     test_model_path: Path | None = None,
     skip_val: bool = False,
+    val_classes: list[str] | None = None,
+    val_fitness_metric: str = "ap",
+    save_vis: bool = True,
+    vis_conf: float = 0.5,
+    vis_iou: float = 0.5,
 ) -> None:
     """fit 结束后：先用 checkpoint 做 val；再按 TEST_RATIO 对 test 评估。
 
     ``test_model_path`` 优先用于 test（一般为导出的 ``.onnx``）；为空则回退 ``checkpoint``。
     ``skip_val=True`` 时只跑 test（val 已在外部完成）。
+    test 画框写到该次 core run 目录的 ``vis/``；推理时延写入 ``test_metrics.json``。val 不画、不计时延。
     """
     sys.path.insert(0, str(_TRAIN_DIR))
     from test_core import run_val
@@ -357,6 +372,8 @@ def run_post_train_eval(
             seed=seed,
             single_cls=single_cls,
             metrics_filename="val_metrics.json",
+            val_classes=val_classes,
+            val_fitness_metric=val_fitness_metric,
         )
     if test_ratio <= 0:
         logger.info("TEST_RATIO=%s <= 0，跳过 test 评估", test_ratio)
@@ -388,6 +405,12 @@ def run_post_train_eval(
         seed=seed,
         single_cls=single_cls,
         metrics_filename="test_metrics.json",
+        val_classes=val_classes,
+        val_fitness_metric=val_fitness_metric,
+        save_vis=save_vis,
+        vis_conf=vis_conf,
+        vis_iou=vis_iou,
+        record_latency=True,
     )
 
 
@@ -416,6 +439,10 @@ def run_train(
     backbone_lr: float,
     weight_decay: float,
     test_ratio: float,
+    val_classes: list[str] | None = None,
+    save_vis: bool = True,
+    vis_conf: float = 0.5,
+    vis_iou: float = 0.5,
 ) -> None:
     sys.path.insert(0, str(DETECT_CORE_ROOT))
     os.chdir(DETECT_CORE_ROOT)
@@ -462,6 +489,7 @@ def run_train(
         "print_freq": 50,
         "checkpoint_freq": 5,
         "val_fitness_metric": metric,
+        "val_classes": list(val_classes or []),
         "patience": max(0, patience),
         "sync_bn": False,
         "train_dataloader": {
@@ -509,7 +537,7 @@ def run_train(
         update["tuning"] = None
 
     logger.info(
-        "detect_core: nc=%d imgsz=%d epochs=%d batch=%d device=%s amp=%s yml=%s tuning=%s output_dir=%s val_fitness_metric=%s patience=%d",
+        "detect_core: nc=%d imgsz=%d epochs=%d batch=%d device=%s amp=%s yml=%s tuning=%s output_dir=%s val_fitness_metric=%s val_classes=%s patience=%d",
         len(names),
         imgsz,
         epochs,
@@ -520,6 +548,7 @@ def run_train(
         tuning,
         run_dir,
         metric,
+        ",".join(val_classes or []) or "全体",
         patience,
     )
     ycfg = YAMLConfig(str(model_yml), **update)
@@ -561,6 +590,8 @@ def run_train(
         seed=seed,
         single_cls=single_cls,
         metrics_filename="val_metrics.json",
+        val_classes=val_classes,
+        val_fitness_metric=metric,
     )
     if export_onnx:
         from src.misc.onnx_export import export_to_onnx
@@ -585,6 +616,11 @@ def run_train(
         val_split=val_split,
         test_model_path=onnx_path,
         skip_val=True,
+        val_classes=val_classes,
+        val_fitness_metric=metric,
+        save_vis=save_vis,
+        vis_conf=vis_conf,
+        vis_iou=vis_iou,
     )
 
 
@@ -619,6 +655,12 @@ def main(
     lr: float,
     backbone_lr: float,
     weight_decay: float,
+    split_each_dir: bool = True,
+    voc_paths: list[Path] | None = None,
+    val_classes: list[str] | None = None,
+    save_vis: bool = True,
+    vis_conf: float = 0.5,
+    vis_iou: float = 0.5,
 ) -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     _line_buffer_stdio()
@@ -639,6 +681,8 @@ def main(
             keep_empty_labels=keep_empty_labels,
             copy_images=copy_images,
             label_format="detect",
+            voc_paths=voc_paths,
+            split_each_dir=split_each_dir,
         )
         logger.info("数据集统计:\n%s", json.dumps(stats, ensure_ascii=False, indent=2))
         if prepare_only:
@@ -657,6 +701,7 @@ def main(
 
     sync_data_yaml_path(output_dir)
     class_names = read_class_names(output_dir)
+    focused = resolve_val_classes(val_classes, class_names, single_cls=single_cls)
     resolved_device = solver_device(device)
     run_train(
         output_dir=output_dir,
@@ -682,7 +727,50 @@ def main(
         backbone_lr=backbone_lr,
         weight_decay=weight_decay,
         test_ratio=test_ratio,
+        val_classes=focused,
+        save_vis=save_vis,
+        vis_conf=vis_conf,
+        vis_iou=vis_iou,
     )
+
+
+def resolve_core_model_yml(cfg: dict[str, Any]) -> Path:
+    """未写 ``model_yml`` 时，按 ``backbone``（r18 / r34 / r50）关联 scanly yaml。"""
+    raw = cfg.get("model_yml")
+    if raw:
+        path = Path(str(raw))
+        logger.info("使用配置中的 model_yml: %s", path)
+        return path
+    token = str(cfg.get("backbone") or "").strip().lower()
+    yml_name = _CORE_YML_BY_BACKBONE.get(token)
+    if not yml_name:
+        allowed = "、".join(_CORE_YML_BY_BACKBONE)
+        raise ValueError(
+            f"backbone 须为 {allowed}，当前为 {token!r}。"
+            "训练 yaml 按骨干自动选择 configs/core/core_*vd_scanly.yml，不必再写 model_yml。"
+        )
+    path = (DETECT_CORE_ROOT / "configs" / "core" / yml_name).resolve()
+    if not path.is_file():
+        raise FileNotFoundError(f"未找到骨干 {token} 的 yaml: {path}")
+    logger.info("backbone=%s → model_yml=%s", token, path)
+    _warn_tuning_backbone_mismatch(cfg, token)
+    return path
+
+
+def _warn_tuning_backbone_mismatch(cfg: dict[str, Any], backbone: str) -> None:
+    blob = " ".join(str(cfg.get(key) or "") for key in ("tuning", "tuning_url"))
+    found: list[str] = []
+    for match in _BACKBONE_TOKEN.finditer(blob.lower()):
+        token = match.group(1)
+        if token not in found:
+            found.append(token)
+    others = [token for token in found if token != backbone]
+    if others:
+        logger.warning(
+            "backbone=%s，但 tuning/tuning_url 含 %s。yaml 已按 backbone 选择，预训练须与该骨干一致。",
+            backbone,
+            "、".join(others),
+        )
 
 
 def main_from_config(
@@ -698,24 +786,27 @@ def main_from_config(
 
     train_cfg = dict(cfg.get("train") or {})
     val_ratio, test_ratio, seed = split_ratios(cfg)
+    source_root, voc_paths = resolve_prepare_source(cfg)
     tuning_raw = cfg.get("tuning")
     tuning_path = Path(str(tuning_raw)) if tuning_raw else None
     output_raw = cfg.get("output_dir")
     if not output_raw:
         raise ValueError("缺少 output_dir（应在 data_cfg.json 或入口 train_config 中配置）")
     main(
-        source_data_root=resolve_source_root(cfg),
+        source_data_root=source_root,
         output_dir=Path(str(output_raw)),
         train_classes=list(cfg.get("train_classes") or []),
         val_ratio=val_ratio,
         test_ratio=test_ratio,
         seed=seed,
+        split_each_dir=split_each_dir_enabled(cfg),
+        voc_paths=voc_paths,
         keep_empty_labels=bool(cfg.get("keep_empty_labels", False)),
         copy_images=bool(cfg.get("copy_images", True)),
         skip_prepare=bool(cfg.get("skip_prepare", False)),
         prepare_only=bool(cfg.get("prepare_only", False)),
         run_prefix=str(cfg.get("run_prefix") or "detect_core"),
-        model_yml=Path(str(cfg["model_yml"])),
+        model_yml=resolve_core_model_yml(cfg),
         tuning_path=tuning_path,
         tuning_url=str(cfg.get("tuning_url") or ""),
         imgsz=int(train_cfg.get("imgsz", 1024)),
@@ -727,12 +818,16 @@ def main_from_config(
         single_cls=bool(cfg.get("single_cls", False)),
         close_mosaic=int(cfg.get("close_mosaic", 10)),
         val_fitness_metric=str(cfg.get("val_fitness_metric") or "ap50"),
+        val_classes=list(cfg.get("val_classes") or []),
         test_only=test_only,
         resume=resume,
         export_onnx=bool(cfg.get("export_onnx", True)),
         lr=float(train_cfg.get("lr", 0.0001)),
         backbone_lr=float(train_cfg.get("backbone_lr", 0.00001)),
         weight_decay=float(train_cfg.get("weight_decay", 0.0001)),
+        save_vis=bool(cfg.get("save_vis", True)),
+        vis_conf=float(cfg.get("vis_conf", 0.5)),
+        vis_iou=float(cfg.get("vis_iou", 0.5)),
     )
 
 

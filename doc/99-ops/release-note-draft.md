@@ -1,6 +1,44 @@
 # 发布记录草稿
 
+## 2026-10-26
+
+- 4090 缺陷推理改挂 RT-DETRv2 `3.3.1.onnx`（`GlueSeam` / `Tackless` / `GlueGap`，1024）。`class_names` 顺序与导出一致。该机 `.venv` 的 onnxruntime 带 CUDAExecutionProvider；没有该 Provider 时回退 CPU。
+- Python 缺陷推理支持检测 mark 训练检查点 `.pth`：`infer_type=detect`，边长与类名跟检查点（mark 检查点为 `GlueSeam`、`Tackless`、`ResidualTape`，1024）。`ResidualTape` 仍按方案屏蔽。
+- 结果图中文标签改用随包字体 `predict/fonts/NotoSansSC-label.ttf`，避免服务器没有中文字体时「胶缝」「标」「排」显示成方框。
+
+## 2026-10-13
+
+- 检测 mark 的 test 画框改到该次 run 目录的 `vis/`（`predictions.jsonl` 含 IoU）。训练结束把 test 指标写到同目录的 `test_metrics.json`。原先写在数据集根的 `output_dir/vis/`，归档 run 时带不走。
+- 检测 mark 的 test 统计不再只靠运行库评估。画框使用的同一套匹配写入该次 run 的 `test_summary.json`（总计数、按类 TP/FP/FN、precision/recall、至少中一条的图片数），`vis/vis_summary.json` 与它相同。评估失败时这份文件仍然在。
+
+## 2026-10-12
+
+- 检测 core 按 `data_cfg.json` 的 `val_classes` 选 `best.pth` 和早停：只对这些类做不加权平均。全体 COCO 指标仍写入日志；训后指标增加 `val_select`。空列表保持按全部类别选模。
+- 修复 `val_classes` 非空时首轮 val 后崩溃：`params.iouThrs` 按序列读取，不再对 numpy 数组做 `or []`。训练 loss 先 `detach` 再判断是否有限，去掉 requires_grad 标量警告。
+- 新增检测 mark 训练入口 `train_mark.py`，配置在 `train_detect_mark/train_config.json`。数据仍用公共 `train_detect_cfg/data_cfg.json`，直接训练已准备的 YOLO 目录。目录、配置和日志不写上游实现名称。
+- 检测 mark 的 `imgsz` 定为 1024，与 YOLO / 检测 core 对齐。`size=s` 接受该边长；显存不够再把 `batch` 降到 2、`grad_accum_steps` 提到 2。
+- 检测 mark：`model_path` 指定本地预训练权重；公共 `val_classes` 作为 test 评估清单，不写则用 `train_classes`。test 画框写到 `output_dir/vis/`，可单独跑 `test_mark.py`。
+- 检测 mark 的运行库写入 `scanly/train/requirements.txt`（`rfdetr[train,loggers]>=1.11.2`）。
+- 评估画框的相邻标签先下移再右移，避免 FN/FP 文字叠在一起。检测 core 与检测 mark 共用该画法。
+- 检测 core 训练结束的 test 评估默认把画框图写到该次 run 目录的 `vis/`（`save_vis` / `vis_conf` / `vis_iou`）。val 不画。
+- 检测 core 与检测 mark 的 test 评估增加推理时延：core 写入 `test_metrics.json` 的 `latency`，mark 写入 `vis/vis_summary.json`。多次调用时不含第一次。
+
+## 2026-10-10
+
+- 胶缝/开胶 core 本轮：`single_cls=false`，`train_classes` 增加 `ResidualTape`。test/val 指标增加 `per_class_recall50`，日志按类打印 AP50、AP、IoU=0.5 召回。
+
+- `convert_from_ls.py`：`rotation ≠ 0` 时按 Label Studio 存法绕矩形左上角顺时针旋转，取上下两端最大范围写成轴对齐框，不再忽略旋转。
+- `data_cfg.json` 的 `voc_xml_path` 支持字符串或目录列表。多目录时 `voc_split.split_each_dir` 默认打开：每个目录单独按 val/test 比例划分再合并；关闭则全部打乱后一次划分。
+
+## 2026-10-08
+
+- 检测 core 换骨干只改 `train_detect_core/train_config.json` 的 `backbone`（`r18` / `r34` / `r50`）。训练 yaml 自动用 `configs/core/core_*vd_scanly.yml`，不再手写 `model_yml`。
+
 ## 2026-09-30
+
+- `test_core.py` 增加评估可视化开关 `SAVE_VIS`（入口默认开）：写出 `vis/` 画框图（TP/FP/FN + 置信度）、`predictions.jsonl`、`vis_summary.json`；`VIS_CONF`/`VIS_IOU` 不影响 mAP。实现自包含于 `scanly/train/test_core_vis.py`，不依赖 `defects/`。
+
+- 修复检测 core ONNX 评估：`test_core` 对 `.onnx` 强制 batch=1（导出图内 MHA/Reshape 写死 batch=1，训练 batch=4 会触发 `node_view` Reshape 失败）。新增 `export_core.py` 单独导出；勿与 YOLO `tools/convert_2_onnx.py` 混用。
 
 - `train_core.py` 训后顺序改为：最优 `.pth` 做 val →（可选）导出 ONNX → test 优先用 ONNX（`export_onnx=false` 时回退 `.pth`）。
 

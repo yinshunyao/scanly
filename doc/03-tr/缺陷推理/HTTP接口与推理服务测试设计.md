@@ -42,6 +42,7 @@
 | TC-P13 | YOLO ONNX | `model_path` 为 Ultralytics/convert 导出的 detect `.onnx` | 启动后 POST `infer_type=detect` | 可加载；结果结构与 `.pt` 一致 | 否（有权重时） |
 | TC-P14 | RT-DETR 误配 obb | 仅配 RT-DETR `.onnx` 到 `model_path`，`infer_type=obb` | 启动服务 | 按 detect 加载；ready 对 detect 为 true；日志有警告 | 否 |
 | TC-P15 | predict.json 备注 | 打开 `config/predict.json` | 查看 `_readme` | 含 `infer_type` 与路径字段说明 | 否-文档 |
+| TC-P16 | 检测 mark .pth | `model_path` 为 `3.2.7.pth`，`infer_type=detect`，`imgsz=1024`，`class_names` 为 GlueSeam、Tackless、ResidualTape | 启动后 POST `/v1/predict` | `code=0`；检出类名为 GlueSeam 或 Tackless；`ResidualTape` 不进入 results；缺陷 `obb.points` 长度 4、`angle=0` | 否（有权重时） |
 | TC-U01 | 单路上传 | 服务就绪、样张可读 | POST `/v1/predict/upload`，`camera=ch1` + 一个 `files` | `code=0`，`results[0].camera=ch1`，`defects` 长度 1 | 是 |
 | TC-U02 | meta 多相机 | 服务就绪 | `meta.cameras` count 2+1，三个 files | `results` 两路；defects 长度分别为 2、1 | 是 |
 | TC-U03 | 文件数不一致 | 服务启动 | count 合计 2，只传 1 个 file | `code=500`，msg 含不一致 | 是 |
@@ -66,7 +67,7 @@
 | TC-C07 | 空 body | POST `{}` | 无有效字段 | `code=500` | 是 |
 | TC-C08 | 无模型可配置 | 未配权重 | PUT `/v1/scheme` | `code=0` | 是 |
 | TC-G01 | Gradio 出图 | 本机打开 `/` | 上传样张运行 | 框图+表格 | 否-手工 |
-| TC-G02 | Gradio 中文标签 | 本机含中文字体 | 检出带 cn_name 的框 | 结果图标签中文可读，非方框 | 否-手工 |
+| TC-G02 | Gradio 中文标签 | 随包 `fonts/NotoSansSC-label.ttf` 存在 | 检出带 cn_name 的框 | 结果图为「胶缝 0.72 [NG+标+排]」这类可读中文，不是方框 | 否-手工 |
 | TC-D01 | Swagger 响应结构 | 服务启动 | 打开 `/docs` 展开 POST `/v1/predict` Responses | 200 Example 含 camera、defects 二维数组和缺陷字段 | 否-手工 |
 | TC-DIR01 | 目录批量 VOC | `cam2-test` 有图，`predict.json` 可加载 | 跑 `predict_dir.py`（可 `LIMIT=3`） | `Annotations` 有对应 xml；`vis` 有画框图；`summary.json` 计数正确 | 否-手工 |
 | TC-DIR02 | 空检出仍写 xml | 某图无框 | 同上 | 该图仍有 xml，`object` 为空 | 否-手工 |

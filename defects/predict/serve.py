@@ -716,7 +716,8 @@ if __name__ == "__main__":
     OBB_MODEL_PATH: str | None = None
     INFER_TYPE: str | None = None
     SERVER_NAME = "0.0.0.0"
-    SERVER_PORT = 37870
+    # None 时用 predict.json 的 port。4090 对外映射是 6008，写在配置里。
+    SERVER_PORT = None
     INFER_DEVICE: str | None = None
 
     import uvicorn

@@ -2,25 +2,46 @@
   "_comment": "检测训练公共数据。类别见 train_classes（空=全部）。训练超参在各入口 train_config.json。相对路径相对本目录。",
   "source_data_root": "../../样本数据/cam-all-0901",
   "_source_data_root_note": "Label Studio YOLO 导出根：含 images/、labels/、classes.txt（根自身或下层多包可合并）。仅当 voc_xml_path 为空/null 时使用。",
-  "voc_xml_path": "/data/samples/base/CAM1_GlueSeam600张-voc",
-  "_voc_xml_path_note": "扁平 Pascal VOC 根：JPEGImages/ + Annotations/（可选 predefined_classes.txt）。非空则优先于 source_data_root，准备结果写到 output_dir，不得与本源同路径。不用 VOC 时设为 null 或 \"\"。",
-  "output_dir": "/data/samples/output/cam1-GlueSeam",
-  "_output_dir_note": "YOLO 检测数据根（data.yaml / images / labels）兼训练权重输出根。须与 VOC/YOLO 源目录不同。新目录须入口 skip_prepare=false 先准备；已有 data.yaml 可改 true 直接训。core 新 run 写在本目录下按 run_prefix 编号（如 core_r18）；YOLO/OBB 的 Ultralytics project 亦为本目录。入口 JSON 可覆盖。相对路径相对本目录。",
+  "voc_xml_path": [
+    "/root/autodl-tmp/data/CAM1_GlueSeam1000张-voc",
+    "/root/autodl-tmp/data/tackless合并-1013-voc",
+    "/root/autodl-tmp/data/B01B02B03B04B05B06-1028-voc"
+  ],
+  "_voc_xml_path_note": "扁平 Pascal VOC，字符串或字符串列表。每项为 JPEGImages/ + Annotations/（可选 predefined_classes.txt），或含多个此类包的父目录。非空则优先于 source_data_root。多项时按 voc_split.split_each_dir 划分，图像名加目录名避免重名。不用 VOC 时设为 null、\"\" 或 []。准备结果写到 output_dir，不得与任一源同路径。v3.3.5：胶缝 1000、开胶合并 1000、崩缺合并换为 B01…B06-1028（含 B05/B06）。",
+  "output_dir": "/root/autodl-tmp/output/v3.3.5",
+  "_output_dir_note": "YOLO 检测数据根（data.yaml / images / labels）兼训练权重输出根。须与 VOC/YOLO 源目录不同。新目录须入口 skip_prepare=false 先准备；已有 data.yaml 可改 true 直接训。core / mark 新 run 写在本目录下按 run_prefix 编号（如 core_r18、mark_s）；YOLO/OBB 的 Ultralytics project 亦为本目录。入口 JSON 可覆盖。相对路径相对本目录。",
   "train_classes_all": [
     "Above",
     "BandBroken",
     "Below",
-    "Shorter"
+    "Shorter",
+    "ClampGlue",
+    "GlueGap",
+    "GlueResidue",
+    "GlueSeam",
+    "Longer",
+    "ResidualTape",
+    "Tackless"
   ],
   "train_classes": [
-    "GlueSeam"
+    "GlueSeam",
+    "Tackless",
+    "GlueGap"
   ],
-  "_train_classes_note": "顺序即 class id。空列表=全部类别。注释掉的类在入口 JSON 覆盖或改本文件。完整候选见 OR/DR。",
+  "val_classes": [
+    "GlueSeam",
+    "Tackless",
+    "GlueGap"
+  ],
+  "_val_classes_note": "评估关注类别，须是 train_classes 的子集。未写、null 或空列表：检测 core 按全部评估类别选模；检测 mark 的 test 按 train_classes 画框和计数。非空时两边都只用这份列表。检测 core 用它做 best.pth 与早停的不加权平均（再套 val_fitness_metric），全体 AP 和按类指标仍写入日志。残带留在 train_classes 里训练，不放进本列表就不参与选模。single_cls=true 时不要填。YOLO / OBB 不读此键。",
+  "_train_classes_note": "顺序即 class id。空列表=全部类别。v3.3：胶缝、开胶、崩缺三类。",
   "voc_split": {
     "val_ratio": 0.1,
     "test_ratio": 0.1,
-    "seed": 42
+    "seed": 42,
+    "split_each_dir": true
   },
+  "_voc_split_note": "split_each_dir 默认 true：voc_xml_path 有多项时，每个目录单独按 val_ratio/test_ratio 划分再合并。false：全部样本打乱后一次划分。只有一个 VOC 路径时，true 仍按该路径下各个包分层（与原先一致）。比例都为 0 时不划分。",
   "keep_empty_labels": true,
   "copy_images": false
 }

@@ -13,6 +13,7 @@
 - `SINGLE_CLS` 只影响 COCO、不改写 YOLO 标签
 - 训练入口变量运行、run 目录递增、只准备 / 只验证
 - `fit` 结束后自动 val，再按 `TEST_RATIO` 与 test 图像决定是否 test
+- test 画框写到该次 core run 目录的 `vis/`；test 指标含推理时延。val 不画、不计时延
 - 不引用 scanly 以外工程的训练代码
 
 # 测试用例
@@ -28,10 +29,20 @@
 | TC-07 | 有 `best.pth` | `TEST_ONLY=True`、`RESUME` 指向该文件 | 只评估，不写新编号训练目录 | 否 |
 | TC-08 | 入口源码 | 检查 import | 不出现 scanly 以外工程训练目录的 import | 否 |
 | TC-09 | 同目录 `prepare_dataset` 无 `test_ratio` 形参 | `SKIP_PREPARE=False` 跑入口 | 不抛 `unexpected keyword argument 'test_ratio'`；日志警告已忽略该参数；仍写出 train/val | 否 |
-| TC-10 | 短训结束，`TEST_RATIO>0` 且 `images/test` 有图，`export_onnx=true` | 跑完 `train_core.py`（非 `TEST_ONLY`） | 日志顺序：val（`.pth`）→ 导出 ONNX → test（`.onnx`）；run 目录有 `val_metrics.json`、`test_metrics.json` 与同名 `.onnx` | 否 |
+| TC-10 | 短训结束，`TEST_RATIO>0` 且 `images/test` 有图，`export_onnx=true`，`save_vis=true` | 跑完 `train_core.py`（非 `TEST_ONLY`） | 日志顺序：val（`.pth`）→ 导出 ONNX → test（`.onnx`，batch 强制 1）；run 目录有 `val_metrics.json`、`test_metrics.json` 与同名 `.onnx`；该 run 的 `vis/` 有画框图；`test_metrics.json` 有 `latency`（`scope=session_run`）且日志有时延；`val_metrics.json` 无 `latency`、无 val 画框；不出现 `node_view` Reshape 失败 | 否 |
 | TC-10b | 同上但 `export_onnx=false` | 跑完训练 | test 回退用 `.pth`；有 `test_metrics.json`；无新导出 `.onnx` | 否 |
+| TC-10c | 已有 `best.pth` | 改 `export_core.py` 的 `CHECKPOINT`/`IMGSZ`/`SINGLE_CLS` 后运行 | 写出同名 `.onnx`；`onnx.checker` 通过 | 否 |
 | TC-11 | `TEST_RATIO=0` | 跑完训练 | 有 `val_metrics.json`；日志声明跳过 test；不写 `test_metrics.json`；仍可按开关导出 ONNX | 否 |
 | TC-12 | `TEST_RATIO>0` 但 `images/test` 为空 | 跑完训练 | val 完成；日志警告跳过 test；训练不因此失败 | 否 |
+| TC-13 | 入口 `backbone` 为 `r18` / `r34` / `r50`，未写 `model_yml` | 启动 `train_core.py`（看到 yaml 日志即可停） | 使用 `configs/core/core_<骨干>vd_scanly.yml`；日志打出 backbone 与该 yaml | 否 |
+| TC-14 | `backbone` 不是这三档，且未写 `model_yml` | 启动 `train_core.py` | 报错，说明须为 `r18` / `r34` / `r50` | 否 |
+| TC-15 | 同时写了 `model_yml` | 启动 `train_core.py` | 使用所写 yaml，不按 `backbone` 改路径 | 否 |
+| TC-16 | `val_classes` 为 GlueSeam、Tackless，`train_classes` 另含 ResidualTape，`single_cls=false` | 短训或看首轮日志 | 日志 `val_classes: GlueSeam,Tackless`；选模行标签为 `select`；`best_stat.json` 的 `val_classes` 只有这两类；`test_coco_eval_bbox` 仍是全体 12 项 | 否 |
+| TC-17 | `val_classes` 含不在 `classes.txt` 的名字，或 `single_cls=true` 且列表非空 | 启动 `train_core.py` | 启动失败，提示类别不在训练类别中，或单类不能按 `val_classes` 选模 | 否 |
+| TC-18 | `val_classes` 为 `[]` | 短训 | 选模行标签为 `all`，fitness 用全体 AP | 否 |
+| TC-21 | `val_classes` 非空；COCO `params.iouThrs` 为多元素 numpy 数组 | 首轮 val 后计算选模指标 | 不抛数组真值 ambiguous；`select` 行打出这些类的 fitness | 否 |
+| TC-19 | test 有图，`save_vis=false`，`export_onnx=false` | 跑完训练后的 test | 无该 run 的 `vis/`；`test_metrics.json` 仍有 `latency`，`scope=forward_postprocess`；mAP 正常 | 否 |
+| TC-20 | `save_vis=true`，test 多于一张图 | 看 `test_metrics.json` 的 `latency` | `images` 比 test 张数少掉第一次调用的批量；`warmup_excluded` 等于丢掉的张数；`mean_ms` / `p50_ms` / `p95_ms` 为数字 | 否 |
 
 # 自动化测试标识
 

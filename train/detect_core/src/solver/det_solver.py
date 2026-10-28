@@ -42,6 +42,18 @@ def _finite(value, default=float("-inf")):
     return v if math.isfinite(v) else default
 
 
+def _as_seq(value):
+    """把 COCO 的 list / numpy 数组收成 list。禁止对数组做真值判断。"""
+    if value is None:
+        return []
+    if isinstance(value, (str, bytes)):
+        return [value]
+    try:
+        return list(value)
+    except TypeError:
+        return []
+
+
 def _empty_best_stat():
     return {
         "epoch": -1,
@@ -84,13 +96,98 @@ def fitness_from_metrics(metrics, metric: str) -> float:
 
 def bbox_select_metrics(stats, metric: str = _VAL_FITNESS_DEFAULT):
     """从 coco_eval_bbox.stats 取出 AP / AP50 / AR，并按配置算 fitness。"""
-    seq = list(stats or [])
+    seq = _as_seq(stats)
     ap = _finite(seq[_COCO_AP] if len(seq) > _COCO_AP else None)
     ap50 = _finite(seq[_COCO_AP50] if len(seq) > _COCO_AP50 else None)
     ar = _finite(seq[_COCO_AR100] if len(seq) > _COCO_AR100 else None)
     out = {"ap": ap, "ap50": ap50, "ar": ar, "metric": normalize_val_fitness_metric(metric)}
     out["fitness"] = fitness_from_metrics(out, out["metric"])
     return out
+
+
+def _mean_valid(arr):
+    import numpy as np
+
+    data = np.asarray(arr, dtype=np.float64)
+    valid = data[np.isfinite(data) & (data > -1.0)]
+    if valid.size == 0:
+        return None
+    return float(valid.mean())
+
+
+def _mean_numbers(values):
+    present = [float(v) for v in values if v is not None and math.isfinite(float(v))]
+    if not present:
+        return None
+    return sum(present) / len(present)
+
+
+def class_scores_from_coco_eval(coco_eval) -> dict:
+    """按类取出 AP、AP50、AR@100（area=all, maxDet=100）。无真值的类对应值为 None。"""
+    if coco_eval is None:
+        return {}
+    payload = getattr(coco_eval, "eval", None) or {}
+    precision = payload.get("precision") if isinstance(payload, dict) else None
+    recall = payload.get("recall") if isinstance(payload, dict) else None
+    if precision is None:
+        return {}
+    params = coco_eval.params
+    cat_ids = [int(x) for x in _as_seq(getattr(params, "catIds", None))]
+    iou_thrs = [float(x) for x in _as_seq(getattr(params, "iouThrs", None))]
+    t50 = 0
+    for index, thr in enumerate(iou_thrs):
+        if abs(thr - 0.5) < 1e-6:
+            t50 = index
+            break
+    id_to_name: dict[int, str] = {}
+    gt = getattr(coco_eval, "cocoGt", None) or getattr(coco_eval, "coco_gt", None)
+    if gt is not None and hasattr(gt, "loadCats") and cat_ids:
+        for cat in gt.loadCats(cat_ids):
+            id_to_name[int(cat["id"])] = str(cat["name"])
+    scores: dict[str, dict] = {}
+    for idx, cat_id in enumerate(cat_ids):
+        name = id_to_name.get(cat_id) or str(cat_id)
+        scores[name] = {
+            "ap": _mean_valid(precision[:, :, idx, 0, -1]),
+            "ap50": _mean_valid(precision[t50, :, idx, 0, -1]),
+            "ar": None if recall is None else _mean_valid(recall[:, idx, 0, -1]),
+        }
+    return scores
+
+
+def metrics_for_selection(stats, coco_eval_bbox, class_names, metric: str = _VAL_FITNESS_DEFAULT):
+    """选模指标。``class_names`` 为空时用全体 COCO stats；非空时只平均这些类。"""
+    names = [str(name) for name in (class_names or [])]
+    if not names:
+        out = bbox_select_metrics(stats, metric)
+        out["val_classes"] = []
+        return out
+    scores = class_scores_from_coco_eval(coco_eval_bbox)
+    missing = [name for name in names if name not in scores]
+    if missing:
+        known = ", ".join(scores) or "（无）"
+        raise ValueError(
+            f"val_classes 不在本次评估类别中: {missing}。评估类别: {known}"
+        )
+    per_class = {name: scores[name] for name in names}
+    out = {
+        "ap": _mean_numbers(scores[name]["ap"] for name in names),
+        "ap50": _mean_numbers(scores[name]["ap50"] for name in names),
+        "ar": _mean_numbers(scores[name]["ar"] for name in names),
+        "metric": normalize_val_fitness_metric(metric),
+        "val_classes": names,
+        "per_class": per_class,
+        "skipped": [name for name in names if scores[name]["ap"] is None],
+    }
+    out["fitness"] = fitness_from_metrics(out, out["metric"])
+    return out
+
+
+def _stored_val_classes(stat) -> list:
+    raw = stat.get("val_classes") if isinstance(stat, dict) else None
+    if not isinstance(raw, list):
+        return []
+    return [str(name) for name in raw]
 
 
 def is_better_bbox(current, best) -> bool:
@@ -107,11 +204,11 @@ def _metric_cell(value, width=6, digits=3) -> str:
     return f"{v:{width}.{digits}f}"
 
 
-def _print_val_row(metrics, *, n_images: int, improved: bool) -> None:
+def _print_val_row(metrics, *, n_images: int, improved: bool, label: str = "all") -> None:
     n_txt = f"{n_images:6d}" if n_images >= 0 else f"{'-':>6}"
     star = " *" if improved else ""
     print(
-        f"{'all':>8} {n_txt}  AP {_metric_cell(metrics.get('ap'))}  "
+        f"{label:>8} {n_txt}  AP {_metric_cell(metrics.get('ap'))}  "
         f"AP50 {_metric_cell(metrics.get('ap50'))}  AR {_metric_cell(metrics.get('ar'))}  "
         f"fitness {_metric_cell(metrics.get('fitness'), 7, 4)}{star}",
         flush=True,
@@ -158,14 +255,30 @@ class DetSolver(BaseSolver):
         self.val_fitness_metric = normalize_val_fitness_metric(
             getattr(args, "val_fitness_metric", None)
         )
+        self.val_classes = [str(name) for name in (getattr(args, "val_classes", None) or [])]
+        stored_classes = _stored_val_classes(self.best_stat)
+        self._allow_best_overwrite = False
+        if int(self.best_stat.get("epoch", -1)) >= 0 and stored_classes != self.val_classes:
+            print(
+                "val_classes 与 checkpoint 的 best_stat 不一致，选模重新计。"
+                "下一轮更高的 fitness 会覆盖 best.pth。"
+                f" 旧={stored_classes or '全体'} 新={self.val_classes or '全体'}"
+            )
+            self.best_stat = _empty_best_stat()
+            self._allow_best_overwrite = True
         self.best_stat["metric"] = self.val_fitness_metric
+        self.best_stat["val_classes"] = list(self.val_classes)
         self.best_stat["fitness"] = fitness_from_metrics(self.best_stat, self.val_fitness_metric)
         try:
             patience = int(getattr(args, "patience", 0) or 0)
         except (TypeError, ValueError):
             patience = 0
         patience = max(0, patience)
-        print(f"val_fitness_metric: {self.val_fitness_metric} patience: {patience}")
+        class_label = ",".join(self.val_classes) if self.val_classes else "全体"
+        print(
+            f"val_fitness_metric: {self.val_fitness_metric} "
+            f"patience: {patience} val_classes: {class_label}"
+        )
 
         start_time = time.time()
         start_epcoch = self.last_epoch + 1
@@ -215,13 +328,19 @@ class DetSolver(BaseSolver):
                     for i, v in enumerate(test_stats[k]):
                         self.writer.add_scalar(f'Test/{k}_{i}'.format(k), v, epoch)
 
-            metrics = bbox_select_metrics(
-                test_stats.get("coco_eval_bbox"), self.val_fitness_metric
+            bbox_eval = None
+            if coco_evaluator is not None:
+                bbox_eval = coco_evaluator.coco_eval.get("bbox")
+            metrics = metrics_for_selection(
+                test_stats.get("coco_eval_bbox"),
+                bbox_eval,
+                self.val_classes,
+                self.val_fitness_metric,
             )
             improved = is_better_bbox(metrics, self.best_stat)
             disk_best = bool(self.output_dir) and (self.output_dir / "best.pth").is_file()
             tracked = int(self.best_stat.get("epoch", -1)) >= 0
-            can_write_best = tracked or not disk_best
+            can_write_best = tracked or (not disk_best) or self._allow_best_overwrite
             if improved and (not can_write_best):
                 print(
                     "skip overwrite best.pth: resume checkpoint has no best_stat "
@@ -243,7 +362,8 @@ class DetSolver(BaseSolver):
                 n_images = len(self.val_dataloader.dataset)
             except Exception:
                 n_images = -1
-            _print_val_row(metrics, n_images=n_images, improved=improved)
+            row_label = "select" if self.val_classes else "all"
+            _print_val_row(metrics, n_images=n_images, improved=improved, label=row_label)
             _print_best_row(self.best_stat, metric_name=self.val_fitness_metric)
 
             if self.output_dir:
@@ -306,15 +426,22 @@ class DetSolver(BaseSolver):
             self.evaluator,
             self.device,
         )
-        metrics = bbox_select_metrics(
+        bbox_eval = None
+        if coco_evaluator is not None:
+            bbox_eval = coco_evaluator.coco_eval.get("bbox")
+        class_names = list(getattr(self.cfg, "val_classes", None) or [])
+        metrics = metrics_for_selection(
             test_stats.get("coco_eval_bbox"),
-            getattr(self, "val_fitness_metric", None),
+            bbox_eval,
+            class_names,
+            getattr(self.cfg, "val_fitness_metric", None),
         )
         try:
             n_images = len(self.val_dataloader.dataset)
         except Exception:
             n_images = -1
-        _print_val_row(metrics, n_images=n_images, improved=False)
+        row_label = "select" if class_names else "all"
+        _print_val_row(metrics, n_images=n_images, improved=False, label=row_label)
 
         if self.output_dir:
             dist_utils.save_on_master(coco_evaluator.coco_eval["bbox"].eval, self.output_dir / "eval.pth")

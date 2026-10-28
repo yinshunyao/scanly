@@ -17,7 +17,8 @@ if str(_TRAIN_DIR) not in sys.path:
 from train import main  # noqa: E402
 from train_detect_cfg.load_cfg import (  # noqa: E402
     load_merged_cfg,
-    resolve_source_root,
+    resolve_prepare_source,
+    split_each_dir_enabled,
     split_ratios,
 )
 
@@ -35,16 +36,19 @@ def main_from_config(config_path: str | Path | None = None) -> None:
 
     train_cfg = dict(cfg.get("train") or {})
     val_ratio, test_ratio, seed = split_ratios(cfg)
+    source_root, voc_paths = resolve_prepare_source(cfg)
     output_raw = cfg.get("output_dir")
     if not output_raw:
         raise ValueError("缺少 output_dir（应在 data_cfg.json 或入口 train_config 中配置）")
     main(
-        source_data_root=resolve_source_root(cfg),
+        source_data_root=source_root,
         output_dir=Path(str(output_raw)),
         train_classes=list(cfg.get("train_classes") or []),
         val_ratio=val_ratio,
         test_ratio=test_ratio,
         seed=seed,
+        split_each_dir=split_each_dir_enabled(cfg),
+        voc_paths=voc_paths,
         keep_empty_labels=bool(cfg.get("keep_empty_labels", False)),
         copy_images=bool(cfg.get("copy_images", True)),
         skip_prepare=bool(cfg.get("skip_prepare", False)),

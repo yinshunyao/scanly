@@ -16,7 +16,7 @@
 1. **输入**：Label Studio JSON 导出，至少支持：
    - 单文件：任务数组（每项含 `data` / `annotations[].result`）
    - 目录：目录下 JSON（每文件可为任务数组或单任务）；**默认递归子目录**
-2. **标注类型**：解析 `rectanglelabels`；坐标为相对百分比（`x/y/width/height`，相对原图宽高的 0–100）。
+2. **标注类型**：解析 `rectanglelabels`；坐标为相对百分比（`x/y/width/height`，相对原图宽高的 0–100）。`rotation` 为绕矩形左上角的顺时针角度；非 0 时按该角度旋转，取上下两端的最大范围，写成轴对齐框。
 3. **输出开关**：配置项可选 `yolo` 或 `voc`（LabelImg / Pascal VOC）。
 4. **YOLO 输出**：目录含 `data.yaml`、`images/train/`、`labels/train/`；标签行为 `class_id cx cy w h`（归一化）。
 5. **LabelImg 输出**：Pascal VOC（`JPEGImages/`、`Annotations/`、`predefined_classes.txt`），可用 LabelImg 的 PascalVOC 模式打开复核。
@@ -38,6 +38,7 @@
 
 - 实现 `scanly/train/tools/convert_from_ls.py`：LS 导出 → YOLO11 / LabelImg（VOC）
 - 入口配置简化为输入目录 + 输出目录；默认递归子目录扫描 JSON/图像
+- 旋转框绕左上角顺时针展开，取上下两端最大范围写成轴对齐框
 
 ## 问题
 

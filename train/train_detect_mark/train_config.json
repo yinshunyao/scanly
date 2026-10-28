@@ -1,0 +1,33 @@
+{
+  "_comment": "检测 mark 入口。本轮 v3.3.3：与 v3.3.1 同数据（胶缝/开胶/崩缺），模型档对齐 v3.2.7（size=n）。数据见 ../train_detect_cfg/data_cfg.json。",
+  "skip_prepare": true,
+  "_skip_prepare_note": "true=复用已有 YOLO staging（与 v3.3.1 / v3.3.2 同目录）。false=按 data_cfg 从 VOC 重写。",
+  "prepare_only": false,
+  "model_path": "/root/autodl-tmp/pretrained/rf-n.pth",
+  "_model_path_note": "本地预训练权重，须与 size 同一档。空则首次训练时按运行库默认下载。",
+  "test_only": false,
+  "save_vis": true,
+  "vis_conf": 0.5,
+  "vis_iou": 0.5,
+  "size": "n",
+  "_size_note": "对齐 v3.2.7：n。换档时同步改 run_prefix 与 model_path。",
+  "run_prefix": "mark_n",
+  "_run_prefix_note": "权重写在 output_dir 下。新 run 自动编号（mark_n、mark_n_2…）。",
+  "resume": "",
+  "device": "cuda",
+  "single_cls": false,
+  "_single_cls_note": "本入口不能把多类并成一类。false 按 data.yaml 的三类训练。",
+  "train": {
+    "imgsz": 1024,
+    "_imgsz_note": "与 v3.2.7 / v3.3.1 对齐为 1024。",
+    "epochs": 80,
+    "batch": 4,
+    "grad_accum_steps": 1,
+    "patience": 25,
+    "_patience_note": "与 v3.2.7 相同：early_stopping_patience=25。",
+    "workers": 4,
+    "lr": 0.0001,
+    "weight_decay": 0.0001,
+    "checkpoint_interval": 10
+  }
+}

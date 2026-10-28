@@ -15,13 +15,13 @@
 
 ## 功能性要求
 
-1. **原始目录**：配置项指定数据集根路径（默认适配 `scanly/样本数据/cam123-0820`）。根目录本身是导出包，或根下多个导出子目录，均须支持。检测入口另提供 `VOC_XML_PATH`：指向扁平 VOC 根（含 `JPEGImages/`、`Annotations/`，以及可选 `predefined_classes.txt`）；非空时优先于 YOLO 源目录。
+1. **原始目录**：配置项指定数据集根路径（默认适配 `scanly/样本数据/cam123-0820`）。根目录本身是导出包，或根下多个导出子目录，均须支持。检测入口另提供 `VOC_XML_PATH`：指向扁平 VOC 根（含 `JPEGImages/`、`Annotations/`，以及可选 `predefined_classes.txt`），可为单个路径或路径列表；非空时优先于 YOLO 源目录。列表中的每一项是一批 VOC（该项自身，或该项下多个 VOC 包）。
 2. **训练类别**：配置项为英文类名列表（与 `classes.txt` / `notes.json` / VOC `object/name` 一致）。只训练列表中的类；其它框丢弃。列表顺序即为训练 class id（从 0 起）。默认列表为相机 1/2/3 合并后的有效类（不含 `Above`：方案关闭且样本极少）。
 3. **跨子目录对齐**：各子目录用各自的 `classes.txt` 把数字 id 还原为类名，再映射到配置的训练类别 id，禁止跨目录直接复用数字 id。
 4. **检测格式**：标签若为多边形（坐标点数 ≥ 6），取外接轴对齐框转为 YOLO 检测行；若已是 4 个数的检测框则保留。VOC `bndbox` 像素框转为归一化 `id cx cy w h`。写出标准 YOLO11 检测目录。转换结果不得写回 VOC 源目录。
 5. **OBB 格式**：标签若已是四点（8 坐标）则保留为 YOLO OBB 行 `id x1 y1 x2 y2 x3 y3 x4 y4`；若为轴对齐检测框则展开为矩形四顶点。写出标准 YOLO11 OBB 目录。本需求不要求同步改造推理服务。
 6. **样本取舍**：过滤后无剩余框的图像默认不进入训练集；可配置是否保留空标签负样本。
-7. **划分**：按子目录分层划分 train/val/test，比例可配置。样本过少时允许 val 回退为 train。
+7. **划分**：按子目录分层划分 train/val/test，比例可配置。样本过少时允许 val 回退为 train。多目录 VOC 增加划分开关，默认打开：每个配置目录单独按该比例划分，再合并成 train/val/test。关闭时全部样本打乱后一次按比例划分。只配置一个 VOC 路径时，仍按该路径下发现的各个包分层划分。比例都为 0 时不划分，开关不起作用。
 8. **训练**：使用 Ultralytics YOLO；检测入口 `task=detect`，OBB 入口 `task=obb`。入口参数放在 `__main__` 变量区（IDE 可直接运行），不强制 argparse。可只做数据准备、不启动训练。检测训练不要求配置 run 子目录名；`TRAIN_PROJECT` 下已有输出时由 Ultralytics 自动递增（`train` / `train2` / …），不覆盖已有 run。检测入口默认 `EPOCHS=200`（上限）、`PATIENCE=25`（val fitness 连续 25 epoch 不刷新 `best.pt` 则早停）。
 9. **单分类训练**：检测入口提供 `SINGLE_CLS`（默认关）。开启后，将已纳入训练的全部框视为同一类（Ultralytics `single_cls`），用于只关心「有无目标」而不区分类型。关闭时保持多类。不改写已预处理标签文件；`SKIP_PREPARE=True` 时同样生效。类别过滤仍由 `TRAIN_CLASSES` 决定。
 10. **测试集验证**：检测入口提供 `test.py`，配置项与 `train.py` 对齐（数据目录、imgsz、batch、device、single_cls）。默认对 `data.yaml` 的 `test` 划分调用 Ultralytics `val`，输出 mAP 等指标；无测试集或权重缺失时报错，提示重新准备或核对路径。不强制 argparse。
@@ -47,6 +47,7 @@
 - 新增 `test.py`：对齐 `train.py` 配置，对已划分测试集做 Ultralytics val
 - `train.py` 去掉 `RUN_NAME`：不覆盖已有 run，由 Ultralytics 自动递增目录
 - `train.py` 支持 `VOC_XML_PATH`：扁平 VOC（JPEGImages + Annotations）转为 YOLO 后再训练
+- `voc_xml_path` 支持单个路径或目录列表；多目录默认每个目录单独划分再合并，可关闭为全部打乱后一次划分
 - 检测入口默认改为 `EPOCHS=200`、`PATIENCE=25`（Ultralytics 早停；200 为上限）
 
 ## 问题

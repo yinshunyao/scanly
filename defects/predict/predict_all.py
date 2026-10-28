@@ -242,12 +242,16 @@ def nms_boxes(
     return [boxes[i] for i in keep]
 
 
+_BUNDLED_FONT = _PREDICT_DIR / "fonts" / "NotoSansSC-label.ttf"
+
+
 def _resolve_cjk_font(size: int = 18) -> Any:
-    """解析可绘制中文的字体；TTC 尝试多子字体；失败时告警并回退。"""
+    """解析可绘制中文的字体。优先随包子集，再找系统字体；失败时告警并回退。"""
     if ImageFont is None:
         return None
 
     candidates = [
+        str(_BUNDLED_FONT),
         # macOS（新系统常无 PingFang.ttc 单文件路径）
         "/System/Library/Fonts/Hiragino Sans GB.ttc",
         "/System/Library/Fonts/STHeiti Medium.ttc",
@@ -319,6 +323,10 @@ def _resolve_cjk_font(size: int = 18) -> Any:
                 continue
             if _can_draw_cjk(font):
                 logger.info("Gradio 画字字体: %s index=%s", path, idx)
+                try:
+                    font._scanly_cjk = True
+                except Exception:
+                    pass
                 return font
 
     logger.warning(
@@ -378,14 +386,16 @@ def draw_results(image_bgr: np.ndarray, results: list[dict[str, Any]]) -> np.nda
             tx, ty = x1, y1
         cn = str(item.get("cn_name") or "")
         name = str(item.get("name") or "")
+        cjk = bool(getattr(font, "_scanly_cjk", False))
         flags = []
         if item.get("ng"):
             flags.append("NG")
         if item.get("need_label"):
-            flags.append("标")
+            flags.append("标" if cjk else "L")
         if item.get("need_discharge"):
-            flags.append("排")
-        label = f"{cn or name} {float(item.get('score') or 0):.2f}"
+            flags.append("排" if cjk else "D")
+        title = (cn or name) if cjk else (name or cn)
+        label = f"{title} {float(item.get('score') or 0):.2f}"
         if flags:
             label = f"{label} [{'+'.join(flags)}]"
         # 按实际文字宽度铺底，避免中文标签被裁切
@@ -393,7 +403,7 @@ def draw_results(image_bgr: np.ndarray, results: list[dict[str, Any]]) -> np.nda
             if hasattr(font, "getbbox"):
                 lb = font.getbbox(label)
                 text_w = max(lb[2] - lb[0], 40)
-                text_h = max(lb[3] - lb[1], 16)
+                text_h = max(lb[3] + 2, 18)
             else:
                 text_w = max(10 * len(label), 40)
                 text_h = 18
@@ -601,6 +611,120 @@ class RtdetrOnnxSession:
         return out
 
 
+def _looks_like_coco_names(names: list[str]) -> bool:
+    return len(names) >= 80 and "person" in names[:5]
+
+
+class RfdetrPthSession:
+    """检测 mark 训练检查点（.pth）：轴对齐框，类名优先读检查点。"""
+
+    def __init__(
+        self,
+        model_path: str | Path,
+        *,
+        class_names: list[str],
+        imgsz: int = 0,
+        device: str | None = None,
+    ) -> None:
+        try:
+            from rfdetr import RFDETR
+        except ImportError as exc:
+            raise ImportError(
+                "检测 mark .pth 需要 rfdetr>=1.11.2，请安装 "
+                "scanly/defects/predict/requirements.txt"
+            ) from exc
+        self.model_path = str(Path(model_path).resolve())
+        kwargs: dict[str, Any] = {}
+        side = int(imgsz or 0)
+        if side > 0:
+            kwargs["resolution"] = side
+        if device:
+            kwargs["device"] = str(device)
+        logger.info("加载检测 mark 权重: %s", self.model_path)
+        try:
+            self.model = RFDETR.from_checkpoint(
+                self.model_path, trust_checkpoint=True, **kwargs
+            )
+        except TypeError:
+            from rfdetr import RFDETRNano
+
+            self.model = RFDETRNano(pretrain_weights=self.model_path, **kwargs)
+        loaded = [str(n) for n in (getattr(self.model, "class_names", None) or [])]
+        fallback = [str(n) for n in class_names if str(n).strip() and str(n) != "defect"]
+        if loaded and not _looks_like_coco_names(loaded):
+            names = loaded
+        elif fallback:
+            names = fallback
+        else:
+            names = loaded or ["defect"]
+        self.names = {i: n for i, n in enumerate(names)}
+        logger.info(
+            "检测 mark 已加载: path=%s names=%s resolution=%s",
+            self.model_path,
+            names,
+            getattr(getattr(self.model, "model_config", None), "resolution", side),
+        )
+
+    def predict_tile(
+        self, tile_bgr: np.ndarray, *, conf: float, ox: int, oy: int
+    ) -> list[dict[str, Any]]:
+        from PIL import Image
+
+        work = tile_bgr
+        if work.ndim == 2:
+            work = cv2.cvtColor(work, cv2.COLOR_GRAY2BGR)
+        elif work.ndim == 3 and work.shape[2] == 1:
+            work = cv2.cvtColor(work[:, :, 0], cv2.COLOR_GRAY2BGR)
+        rgb = cv2.cvtColor(work, cv2.COLOR_BGR2RGB)
+        image = Image.fromarray(rgb)
+        try:
+            raw = self.model.predict(
+                image, threshold=float(conf), include_source_image=False
+            )
+        except TypeError:
+            raw = self.model.predict(image, threshold=float(conf))
+        if isinstance(raw, (list, tuple)):
+            raw = raw[0] if raw else None
+        xyxy = None if raw is None else getattr(raw, "xyxy", None)
+        if xyxy is None or len(xyxy) == 0:
+            return []
+        confs = getattr(raw, "confidence", None)
+        cls_ids = getattr(raw, "class_id", None)
+        name_arr = None
+        data = getattr(raw, "data", None)
+        if isinstance(data, dict):
+            name_arr = data.get("class_name")
+        out: list[dict[str, Any]] = []
+        for i, box in enumerate(xyxy):
+            score = float(confs[i]) if confs is not None else 1.0
+            if score < conf:
+                continue
+            name = ""
+            if name_arr is not None and i < len(name_arr):
+                name = str(name_arr[i] or "")
+            cls_id = int(cls_ids[i]) if cls_ids is not None else 0
+            if not name or name == "__background__":
+                name = self.names.get(cls_id, "")
+            if not name or name == "__background__":
+                continue
+            coords = np.asarray(box, dtype=float).reshape(-1)
+            if coords.size < 4:
+                continue
+            gx1 = float(coords[0]) + ox
+            gy1 = float(coords[1]) + oy
+            gx2 = float(coords[2]) + ox
+            gy2 = float(coords[3]) + oy
+            out.append(
+                {
+                    "name": name,
+                    "score": score,
+                    "xyxy": [gx1, gy1, gx2, gy2],
+                    "obb": xyxy_to_obb(gx1, gy1, gx2, gy2),
+                }
+            )
+        return out
+
+
 class DefectPredictAll:
     """加载一次检测/OBB 模型，重复推理。"""
 
@@ -633,7 +757,18 @@ class DefectPredictAll:
         self.default_infer_type = normalize_infer_type(
             cfg.get("infer_type"), default="obb"
         )
-        # RT-DETRv2 ONNX 仅 detect：不要把唯一路径误当成 OBB
+        # RT-DETRv2 ONNX 与检测 mark .pth 仅 detect：不要把唯一路径误当成 OBB
+        if (
+            self.default_infer_type == "obb"
+            and not obb_path
+            and detect_path
+            and str(detect_path).lower().endswith(".pth")
+        ):
+            logger.warning(
+                "检测 mark .pth 仅支持 detect，已将默认 infer_type 从 obb 改为 detect: %s",
+                detect_path,
+            )
+            self.default_infer_type = "detect"
         if (
             self.default_infer_type == "obb"
             and not obb_path
@@ -668,6 +803,33 @@ class DefectPredictAll:
             logger.warning("%s 模型文件不存在，服务可启动但该类型预测未就绪: %s", infer_type, p)
             return
         suffix = p.suffix.lower()
+        if suffix == ".pth":
+            if infer_type == "obb":
+                logger.warning(
+                    "检测 mark .pth 不能作为 OBB 权重，改注册为 detect: %s", p
+                )
+                infer_type = "detect"
+                if not self.model_path:
+                    self.model_path = str(p)
+                if self.obb_model_path == str(p):
+                    self.obb_model_path = ""
+                if self.default_infer_type == "obb":
+                    self.default_infer_type = "detect"
+            try:
+                session = RfdetrPthSession(
+                    p,
+                    class_names=self.class_names,
+                    imgsz=self.imgsz,
+                    device=None if self.device is None else str(self.device),
+                )
+            except Exception as exc:
+                logger.warning("加载检测 mark .pth 失败: %s", exc)
+                return
+            self._models[infer_type] = session
+            self._names[infer_type] = dict(session.names)
+            if session.names:
+                self.class_names = [session.names[i] for i in sorted(session.names)]
+            return
         if suffix == ".onnx":
             try:
                 kind = probe_onnx_kind(p)
@@ -765,7 +927,7 @@ class DefectPredictAll:
         with self._infer_lock:
             for x1, y1, x2, y2 in iter_tiles(h, w, self.clip_size, self.overlap_size):
                 tile = np.ascontiguousarray(image_bgr[y1:y2, x1:x2])
-                if isinstance(model, RtdetrOnnxSession):
+                if isinstance(model, (RtdetrOnnxSession, RfdetrPthSession)):
                     raw.extend(
                         model.predict_tile(
                             tile, conf=self.conf, ox=x1, oy=y1

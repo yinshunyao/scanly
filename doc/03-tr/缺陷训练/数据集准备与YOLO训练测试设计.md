@@ -18,6 +18,7 @@
 - `test.py` 对 `data.yaml` 的 test 划分做 val
 - 连续训练自动递增 `runs/train`、`runs/train2`，不覆盖已有 run
 - 检测入口默认 `epochs=200`、`patience=25` 写入 run 的 `args.yaml`
+- `voc_xml_path` 列表与 `split_each_dir`（分目录划分 / 全部打乱）
 
 # 测试用例
 
@@ -43,6 +44,11 @@
 | TC-18 | 同 TC-17，某 xml 的 `object/name` 不在 `TRAIN_CLASSES` | 准备数据 | 该框丢弃；过滤后无框且 `KEEP_EMPTY_LABELS=False` 则该图不进入输出 | 否 |
 | TC-19 | `OUTPUT_DIR` 与 `VOC_XML_PATH` 为同一路径 | 准备数据 | 报错，提示不得与源目录相同 | 否 |
 | TC-20 | 默认 `train.py` 超参 | 开训后读 run 目录 `args.yaml` | `epochs: 200`、`patience: 25` | 否 |
+| TC-21 | `voc_xml_path` 为两个 VOC 根的列表，各 10 张，图像 stem 相同；`split_each_dir=true`，`val_ratio=0.2`，`test_ratio=0` | 准备数据 | 两个目录都进入输出；val 各约 2 张；输出文件名带目录名，不互相覆盖；`stats.split_each_dir=true` 且 `source_roots` 为两项 | 否 |
+| TC-22 | 同 TC-21，`split_each_dir=false` | 准备数据 | 20 张打乱后按 0.2 一次划出 val（约 4 张），不按目录各留固定张数；`stats.split_each_dir=false` | 否 |
+| TC-23 | `voc_xml_path` 仍为单个字符串 | 准备数据 | 与单目录 VOC 准备一致，不因列表能力改变划分 | 否 |
+| TC-24 | 列表中某一项不是扁平 VOC | 准备数据 | 报错并指出该路径 | 否 |
+| TC-25 | 列表中两项解析后为同一路径 | 准备数据 | 报错，提示重复目录 | 否 |
 
 # 自动化测试标识
 

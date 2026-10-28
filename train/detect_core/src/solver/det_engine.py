@@ -82,8 +82,13 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         if lr_warmup_scheduler is not None:
             lr_warmup_scheduler.step()
 
-        loss_dict_reduced = dist_utils.reduce_dict(loss_dict)
+        loss_dict_reduced = {
+            k: v.detach() if torch.is_tensor(v) else v
+            for k, v in dist_utils.reduce_dict(loss_dict).items()
+        }
         loss_value = sum(loss_dict_reduced.values())
+        if torch.is_tensor(loss_value):
+            loss_value = loss_value.detach()
 
         if not math.isfinite(loss_value):
             print("Loss is {}, stopping training".format(loss_value))

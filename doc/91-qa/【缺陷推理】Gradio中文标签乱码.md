@@ -16,14 +16,15 @@ Ubuntu 建议安装：`sudo apt install fonts-wqy-microhei fonts-noto-cjk` 后�
 
 # 根因分析
 
-`predict_all.draw_results` 通过 Pillow 绘制中文，字体解析 `_resolve_cjk_font` 优先使用 `/System/Library/Fonts/PingFang.ttc`。新 macOS 上该路径不存在；部分 `.ttc` 未指定子字体索引时加载失败，最终回退到 `ImageFont.load_default()`（仅拉丁字形），中文显示为方框。
+`predict_all.draw_results` 用 Pillow 画「胶缝 0.72 [NG+标+排]」。4090 镜像没有文泉驿或 Noto，系统字体候选全部落空，回退到 `ImageFont.load_default()`。该字体没有中文轮廓，「胶缝」「标」「排」显示为方框；`NG` 与数字正常。
 
 # 涉及文件
 
 | 文件 | 修改摘要 |
 |:---|:---|
-| `scanly/defects/predict/predict_all.py` | 扩展系统中文字体候选；TTC 尝试多 index；用样字校验能否绘制中文；失败打警告 |
+| `scanly/defects/predict/predict_all.py` | 优先加载随包 `fonts/NotoSansSC-label.ttf`；仍找不到可画中文的字体时，类名改英文、贴标/排改 `L`/`D` |
+| `scanly/defects/predict/fonts/NotoSansSC-label.ttf` | Noto Sans SC 子集，只含标签用到的汉字与数字符号 |
 
 # 设计约束更新
 
-Gradio 结果图画字须使用可渲染中文的系统字体（macOS：Hiragino Sans GB / STHeiti / Songti / Arial Unicode；Windows：微软雅黑/黑体；Linux：文泉驿/Noto），不得静默回退到默认拉丁字体而不告警。
+结果图画字优先使用随包字体。系统中文字体仍作后备。找不到可画中文的字体时不得再画方框，改用英文类名，贴标写成 `L`、排出写成 `D`。

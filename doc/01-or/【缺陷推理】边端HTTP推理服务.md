@@ -39,6 +39,7 @@
     - **RT-DETRv2 导出**（`train_core.py` → `images` + `orig_target_sizes` → `labels/boxes/scores`）：仅轴对齐检测，对应 `infer_type=detect`；须可配 `imgsz`（与训练一致）与 `class_names`（缺省单类 `defect`）。
 12. **配置可读性**：`predict.json` 须带字段备注（如 `_readme`），至少说明 `infer_type` 与 `model_path` / `obb_model_path` 如何配对，避免误配。
 13. **目录批量离线推理**：提供本地脚本，对指定图像目录整批推理；输出目录含画框图与 Pascal VOC（`JPEGImages` + `Annotations`/*.xml，可选 `predefined_classes.txt`），便于 LabelImg 复核。入口用 `__main__` 变量配置路径，不强制 CLI。
+14. **检测 mark 权重**：Python 服务须能加载训练检查点 `.pth`（本版类别顺序为 `GlueSeam`、`Tackless`、`ResidualTape`），仅轴对齐检测。`imgsz` 与训练边长一致。类名优先读检查点；检查点没有类名时用配置 `class_names`。`ResidualTape` 仍按屏蔽非缺陷处理，不进入对外结果。
 
 ## 非功能性要求
 
@@ -54,6 +55,7 @@
 
 ## 需求
 
+- 检测 mark 训练检查点 `.pth`：`infer_type=detect`，类名 `GlueSeam` / `Tackless` / `ResidualTape`，边长与训练一致
 - 目录批量离线推理：画框图 + VOC XML（`predict_dir.py`）
 - Python 推理支持明文 ONNX（YOLO + RT-DETRv2）；`predict.json` 补充 `infer_type` 等字段备注
 - 整理缺陷推理 HTTP 对接需求，完成接口/判定设计与测试设计，并实现 `scanly/defects/predict` 第一版（本机路径 HTTP + Gradio）；客户端文档见 `scanly/doc/02-dr/缺陷推理/01.HTTP接口文档.md`
